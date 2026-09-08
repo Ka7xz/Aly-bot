@@ -128,4 +128,78 @@ async function askAly(guildId, username, message) {
               "Your name is Aly. You are a friendly Discord AI companion. " +
               "Talk naturally, casually and like a real Discord user. " +
               "Keep replies reasonably short. You can use casual language and light humor. " +
-              "Do not
+              "Do not constantly say you are an AI. " +
+              "You are participating in a group conversation, so pay attention to usernames and context."
+          },
+          ...history
+        ]
+      })
+    }
+  );
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    console.error("OpenRouter error:", data);
+    throw new Error("OpenRouter request failed");
+  }
+
+  const reply = data?.choices?.[0]?.message?.content;
+
+  if (!reply) {
+    throw new Error("No response from OpenRouter");
+  }
+
+  history.push({
+    role: "assistant",
+    content: reply
+  });
+
+  return reply;
+}
+
+// Automatic normal-message listener
+const cooldowns = new Map();
+
+client.on("messageCreate", async message => {
+  if (!message.guild) return;
+  if (message.author.bot) return;
+
+  const channelId = alyChannels.get(message.guild.id);
+
+  // Aly only works in the one configured channel
+  if (!channelId || message.channel.id !== channelId) return;
+
+  // 8-second cooldown per server
+  const now = Date.now();
+  const cooldown = cooldowns.get(message.guild.id) || 0;
+
+  if (now < cooldown) return;
+
+  cooldowns.set(message.guild.id, now + 8000);
+
+  try {
+    await message.channel.sendTyping();
+
+    const reply = await askAly(
+      message.guild.id,
+      message.author.username,
+      message.content
+    );
+
+    // Discord message limit protection
+    if (reply.length <= 2000) {
+      await message.reply(reply);
+    } else {
+      await message.reply(reply.slice(0, 1997) + "...");
+    }
+  } catch (error) {
+    console.error(error);
+
+    await message.reply(
+      "I couldn't respond right now. Please try again."
+    );
+  }
+});
+
+client.login(process.env.DISCORD_TOKEN);
