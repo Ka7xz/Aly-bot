@@ -134,8 +134,8 @@ function createPanel(guildId) {
       : "Natural";
 
   const statusText = s.enabled
-    ? "🟢 Running"
-    : "🔴 Stopped";
+    ? "Running"
+    : "Stopped";
 
   const embed = new EmbedBuilder()
     .setTitle("Aly Configuration")
@@ -146,7 +146,7 @@ function createPanel(guildId) {
       `**Status:** ${statusText}`
     )
     .setFooter({
-      text: "Aly • AI Companion"
+      text: "Powered By Aly"
     });
 
   const channelMenu = new ChannelSelectMenuBuilder()
@@ -163,7 +163,7 @@ function createPanel(guildId) {
     .addOptions([
       {
         label: "Faster",
-        description: "Aly responds after about 1 second",
+        description: "Aly responds Faster then normal",
         value: "faster",
         default: s.mode === "faster"
       },
@@ -234,6 +234,7 @@ const commands = [
   new SlashCommandBuilder()
     .setName("aly")
     .setDescription("Open Aly's configuration panel")
+    .setDefaultMemberPermissions("8")
     .toJSON()
 ];
 
