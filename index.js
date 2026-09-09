@@ -17,10 +17,6 @@ require("dotenv").config();
 
 const { setAlyStatus } = require("./status");
 
-/* =========================
-   ENV CHECK
-========================= */
-
 if (!process.env.DISCORD_TOKEN) {
   console.error("Missing DISCORD_TOKEN.");
   process.exit(1);
@@ -36,10 +32,6 @@ if (!process.env.GEMINI_API_KEY) {
   process.exit(1);
 }
 
-/* =========================
-   DISCORD CLIENT
-========================= */
-
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -48,16 +40,8 @@ const client = new Client({
   ]
 });
 
-/* =========================
-   STORAGE
-========================= */
-
 const settings = new Map();
 const memory = new Map();
-
-/* =========================
-   GEMINI MODELS
-========================= */
 
 const GEMINI_MODELS = [
   "gemini-3.8-flash",
@@ -83,18 +67,9 @@ function getSettings(guildId) {
   return settings.get(guildId);
 }
 
-/* =========================
-   MODE DELAY
-========================= */
-
 function getDelay(mode) {
-  if (mode === "faster") {
-    return 1000;
-  }
-
-  if (mode === "reduced") {
-    return 1500;
-  }
+  if (mode === "faster") return 1000;
+  if (mode === "reduced") return 1500;
 
   return 1250;
 }
@@ -116,7 +91,7 @@ function clearChannelMemory(channelId) {
 }
 
 /* =========================
-   PANEL
+   ALY PANEL
 ========================= */
 
 function createPanel(guildId) {
@@ -134,20 +109,24 @@ function createPanel(guildId) {
       : "Natural";
 
   const statusText = s.enabled
-    ? "Running"
-    : "Stopped";
+    ? "🟢 Running"
+    : "🔴 Stopped";
 
   const embed = new EmbedBuilder()
     .setTitle("Aly Configuration")
     .setDescription(
-      "Configure how Aly behaves in this server.\n\n" +
       `**Channel:** ${channelText}\n` +
       `**Participation:** ${modeText}\n` +
       `**Status:** ${statusText}`
     )
+    .setColor("#87CEEB")
     .setFooter({
-      text: "Powered By Aly"
+      text: "Aly • AI Companion"
     });
+
+  /* =========================
+     CHANNEL SELECT
+  ========================= */
 
   const channelMenu = new ChannelSelectMenuBuilder()
     .setCustomId("aly_channel")
@@ -157,13 +136,17 @@ function createPanel(guildId) {
   const channelRow = new ActionRowBuilder()
     .addComponents(channelMenu);
 
+  /* =========================
+     MODE SELECT
+  ========================= */
+
   const modeMenu = new StringSelectMenuBuilder()
     .setCustomId("aly_mode")
     .setPlaceholder("Select participation mode")
     .addOptions([
       {
         label: "Faster",
-        description: "Aly responds Faster then normal",
+        description: "Aly responds after about 1 second",
         value: "faster",
         default: s.mode === "faster"
       },
@@ -184,6 +167,10 @@ function createPanel(guildId) {
   const modeRow = new ActionRowBuilder()
     .addComponents(modeMenu);
 
+  /* =========================
+     BUTTONS
+  ========================= */
+
   const applyButton = new ButtonBuilder()
     .setCustomId("aly_apply")
     .setLabel("Apply Settings")
@@ -201,7 +188,7 @@ function createPanel(guildId) {
   const clearButton = new ButtonBuilder()
     .setCustomId("aly_clear")
     .setLabel("Clear Memory")
-    .setStyle(ButtonStyle.Secondary);
+    .setStyle(ButtonStyle.Danger);
 
   const helpButton = new ButtonBuilder()
     .setCustomId("aly_help")
@@ -216,12 +203,25 @@ function createPanel(guildId) {
       helpButton
     );
 
+  /* =========================
+     SUPPORT SERVER
+  ========================= */
+
+  const supportButton = new ButtonBuilder()
+    .setLabel("Support Server")
+    .setStyle(ButtonStyle.Link)
+    .setURL("https://discord.gg/w8ebJj2es");
+
+  const supportRow = new ActionRowBuilder()
+    .addComponents(supportButton);
+
   return {
     embeds: [embed],
     components: [
       channelRow,
       modeRow,
-      buttonRow
+      buttonRow,
+      supportRow
     ]
   };
 }
@@ -239,11 +239,12 @@ const commands = [
 ];
 
 /* =========================
-   BUILD GEMINI CONTENT
+   USER MESSAGE + IMAGES
 ========================= */
 
 async function buildUserParts(message) {
   const parts = [];
+
   const text = message.content?.trim();
 
   if (text) {
@@ -317,7 +318,7 @@ async function buildUserParts(message) {
 }
 
 /* =========================
-   GEMINI REQUEST
+   GEMINI
 ========================= */
 
 async function requestGemini(model, contents) {
@@ -405,10 +406,9 @@ async function requestGemini(model, contents) {
 
   try {
     data = JSON.parse(rawText);
-  } catch (error) {
+  } catch {
     console.error(
-      `[Gemini] ${model} invalid JSON:`,
-      rawText
+      `[Gemini] ${model} returned invalid JSON.`
     );
 
     return null;
@@ -418,11 +418,6 @@ async function requestGemini(model, contents) {
     data?.candidates?.[0];
 
   if (!candidate) {
-    console.error(
-      `[Gemini] ${model} returned no candidate:`,
-      JSON.stringify(data)
-    );
-
     return null;
   }
 
@@ -440,16 +435,7 @@ async function requestGemini(model, contents) {
     .join("")
     .trim();
 
-  if (!text) {
-    console.error(
-      `[Gemini] ${model} returned no usable text:`,
-      JSON.stringify(data)
-    );
-
-    return null;
-  }
-
-  return text;
+  return text || null;
 }
 
 /* =========================
@@ -473,10 +459,6 @@ async function askAly(message, userParts) {
 
   for (const model of GEMINI_MODELS) {
     try {
-      console.log(
-        `[Gemini] Trying ${model}`
-      );
-
       const reply =
         await requestGemini(
           model,
@@ -486,10 +468,6 @@ async function askAly(message, userParts) {
       if (!reply) {
         continue;
       }
-
-      console.log(
-        `[Gemini] Success: ${model}`
-      );
 
       history.push({
         role: "user",
@@ -517,10 +495,6 @@ async function askAly(message, userParts) {
       );
     }
   }
-
-  console.error(
-    "[Gemini] Every configured model failed."
-  );
 
   return null;
 }
@@ -571,6 +545,44 @@ client.on(
   "interactionCreate",
   async interaction => {
     try {
+      /* =========================
+         ADMIN ONLY
+      ========================= */
+
+      if (
+        interaction.guild &&
+        !interaction.memberPermissions?.has(
+          "Administrator"
+        )
+      ) {
+        if (
+          interaction.isChatInputCommand() &&
+          interaction.commandName === "aly"
+        ) {
+          return interaction.reply({
+            content:
+              "You need Administrator permission to use `/aly`.",
+            ephemeral: true
+          });
+        }
+
+        if (
+          interaction.customId?.startsWith(
+            "aly_"
+          )
+        ) {
+          return interaction.reply({
+            content:
+              "You need Administrator permission to change Aly's settings.",
+            ephemeral: true
+          });
+        }
+      }
+
+      /* =========================
+         /ALY
+      ========================= */
+
       if (interaction.isChatInputCommand()) {
         if (
           interaction.commandName !== "aly"
@@ -578,18 +590,19 @@ client.on(
           return;
         }
 
-        await interaction.deferReply({
+        await interaction.reply({
+          ...createPanel(
+            interaction.guild.id
+          ),
           ephemeral: true
         });
 
-        await interaction.editReply(
-          createPanel(
-            interaction.guild.id
-          )
-        );
-
         return;
       }
+
+      /* =========================
+         CHANNEL SELECT
+      ========================= */
 
       if (
         interaction.isChannelSelectMenu() &&
@@ -612,6 +625,10 @@ client.on(
         return;
       }
 
+      /* =========================
+         MODE SELECT
+      ========================= */
+
       if (
         interaction.isStringSelectMenu() &&
         interaction.customId === "aly_mode"
@@ -633,6 +650,10 @@ client.on(
         return;
       }
 
+      /* =========================
+         APPLY SETTINGS
+      ========================= */
+
       if (
         interaction.isButton() &&
         interaction.customId === "aly_apply"
@@ -643,13 +664,11 @@ client.on(
           );
 
         if (!s.channelId) {
-          await interaction.reply({
+          return interaction.reply({
             content:
               "Select a channel first.",
             ephemeral: true
           });
-
-          return;
         }
 
         s.enabled = true;
@@ -663,6 +682,10 @@ client.on(
         return;
       }
 
+      /* =========================
+         START / STOP
+      ========================= */
+
       if (
         interaction.isButton() &&
         interaction.customId === "aly_toggle"
@@ -673,13 +696,11 @@ client.on(
           );
 
         if (!s.channelId) {
-          await interaction.reply({
+          return interaction.reply({
             content:
               "Select a channel first.",
             ephemeral: true
           });
-
-          return;
         }
 
         s.enabled = !s.enabled;
@@ -692,6 +713,10 @@ client.on(
 
         return;
       }
+
+      /* =========================
+         CLEAR MEMORY
+      ========================= */
 
       if (
         interaction.isButton() &&
@@ -708,14 +733,16 @@ client.on(
           );
         }
 
-        await interaction.reply({
+        return interaction.reply({
           content:
             "Aly's memory has been cleared.",
           ephemeral: true
         });
-
-        return;
       }
+
+      /* =========================
+         HELP
+      ========================= */
 
       if (
         interaction.isButton() &&
@@ -744,15 +771,14 @@ client.on(
               "Turns Aly on or off.\n\n" +
 
               "**Clear Memory**\n" +
-              "Clears Aly's conversation memory for the selected channel."
-            );
+              "Clears Aly's conversation memory."
+            )
+            .setColor("#87CEEB");
 
-        await interaction.reply({
+        return interaction.reply({
           embeds: [helpEmbed],
           ephemeral: true
         });
-
-        return;
       }
     } catch (error) {
       console.error(
@@ -783,33 +809,23 @@ client.on(
 );
 
 /* =========================
-   MESSAGE HANDLER
+   MESSAGES
 ========================= */
 
 client.on(
   "messageCreate",
   async message => {
     try {
-      if (!message.guild) {
-        return;
-      }
-
-      if (message.author.bot) {
-        return;
-      }
+      if (!message.guild) return;
+      if (message.author.bot) return;
 
       const s =
         getSettings(
           message.guild.id
         );
 
-      if (!s.enabled) {
-        return;
-      }
-
-      if (!s.channelId) {
-        return;
-      }
+      if (!s.enabled) return;
+      if (!s.channelId) return;
 
       if (
         message.channel.id !==
@@ -847,9 +863,7 @@ client.on(
           userParts
         );
 
-      if (!reply) {
-        return;
-      }
+      if (!reply) return;
 
       await message.reply({
         content: reply.slice(0, 2000),
