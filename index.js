@@ -108,8 +108,8 @@ function createPanel(guildId) {
       : "Natural";
 
   const statusText = s.enabled
-    ? "🟢 Running"
-    : "🔴 Stopped";
+    ? "Running"
+    : "Stopped";
 
   const embed = new EmbedBuilder()
     .setTitle("Aly Configuration")
@@ -121,7 +121,7 @@ function createPanel(guildId) {
     )
     .setColor("#87CEEB")
     .setFooter({
-      text: "Aly • AI Companion"
+      text: "Powered By Aly"
     });
 
   /* =========================
@@ -146,7 +146,7 @@ function createPanel(guildId) {
     .addOptions([
       {
         label: "Faster",
-        description: "Aly responds after about 1 second",
+        description: "Aly responds Faster Then Normal",
         value: "faster",
         default: s.mode === "faster"
       },
@@ -210,7 +210,7 @@ function createPanel(guildId) {
   const supportButton = new ButtonBuilder()
     .setLabel("Support Server")
     .setStyle(ButtonStyle.Link)
-    .setURL("https://discord.gg/w8ebJj2es");
+    .setURL("https://discord.com/channels/1541197389237325956/1541197390139228222");
 
   const supportRow = new ActionRowBuilder()
     .addComponents(supportButton);
