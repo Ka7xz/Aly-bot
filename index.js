@@ -53,14 +53,6 @@ const client = new Client({
 ========================= */
 
 const settings = new Map();
-
-/*
- * Memory is PER ALY CHANNEL,
- * not per user.
- *
- * This lets Aly understand the
- * whole conversation between users.
- */
 const memory = new Map();
 
 /* =========================
@@ -157,10 +149,6 @@ function createPanel(guildId) {
       text: "Aly • AI Companion"
     });
 
-  /* =========================
-     CHANNEL
-  ========================= */
-
   const channelMenu = new ChannelSelectMenuBuilder()
     .setCustomId("aly_channel")
     .setPlaceholder("Select Aly's channel")
@@ -168,10 +156,6 @@ function createPanel(guildId) {
 
   const channelRow = new ActionRowBuilder()
     .addComponents(channelMenu);
-
-  /* =========================
-     MODE
-  ========================= */
 
   const modeMenu = new StringSelectMenuBuilder()
     .setCustomId("aly_mode")
@@ -199,10 +183,6 @@ function createPanel(guildId) {
 
   const modeRow = new ActionRowBuilder()
     .addComponents(modeMenu);
-
-  /* =========================
-     BUTTONS
-  ========================= */
 
   const applyButton = new ButtonBuilder()
     .setCustomId("aly_apply")
@@ -286,10 +266,6 @@ async function buildUserParts(message) {
     });
   }
 
-  /* =========================
-     IMAGES
-  ========================= */
-
   for (const attachment of message.attachments.values()) {
     const contentType =
       attachment.contentType || "";
@@ -344,10 +320,7 @@ async function buildUserParts(message) {
    GEMINI REQUEST
 ========================= */
 
-async function requestGemini(
-  model,
-  contents
-) {
+async function requestGemini(model, contents) {
   const url =
     `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
 
@@ -373,24 +346,22 @@ async function requestGemini(
               "- Do not sound like a customer support bot.\n" +
               "- Do not over-explain simple things.\n" +
               "- Usually keep replies short.\n" +
-              "- Match the user's tone.\n" +
-              "- If the user says something short like 'bro', 'lol', 'dad?', 'what?', or sends an image, respond naturally to exactly that.\n\n" +
+              "- Match the user's tone.\n\n" +
 
               "CONVERSATION RULES:\n" +
               "- You are participating in a shared Discord conversation.\n" +
               "- Multiple users can talk to you in the same channel.\n" +
-              "- Use the conversation history to understand context.\n" +
+              "- Use conversation history to understand context.\n" +
               "- NEVER invent something a user said.\n" +
-              "- NEVER claim that a user said something unless it actually appears in the conversation history.\n" +
+              "- NEVER claim that a user said something unless it appears in the conversation history.\n" +
               "- NEVER pretend something happened earlier if it is not in the history.\n" +
-              "- If you are unsure about something from earlier, simply say you are not sure.\n" +
-              "- Do not create fake memories.\n" +
-              "- Do not randomly bring up unrelated previous topics.\n\n" +
+              "- If you are unsure, simply say you are not sure.\n" +
+              "- Do not create fake memories.\n\n" +
 
               "NAMES:\n" +
-              "- Pay attention to usernames in the conversation.\n" +
-              "- Do not confuse one user with another.\n" +
-              "- Do not assume family relationships between users unless they explicitly say so.\n\n" +
+              "- Pay attention to usernames.\n" +
+              "- Do not confuse users with each other.\n" +
+              "- Do not assume relationships unless explicitly stated.\n\n" +
 
               "IMAGES:\n" +
               "- If an image is provided, actually look at it.\n" +
@@ -406,9 +377,7 @@ async function requestGemini(
               "STYLE:\n" +
               "- Avoid unnecessary emojis.\n" +
               "- Don't use fake enthusiasm every message.\n" +
-              "- Don't ask 'What are you up to today?' after random messages unless it naturally fits.\n" +
               "- Don't repeat the user's message unnecessarily.\n" +
-              "- Don't apologize when there is nothing to apologize for.\n" +
               "- Don't make up context just to make a reply sound interesting."
           }
         ]
@@ -422,8 +391,7 @@ async function requestGemini(
     })
   });
 
-  const rawText =
-    await response.text();
+  const rawText = await response.text();
 
   if (!response.ok) {
     console.error(
@@ -488,10 +456,7 @@ async function requestGemini(
    ASK ALY
 ========================= */
 
-async function askAly(
-  message,
-  userParts
-) {
+async function askAly(message, userParts) {
   const channelId =
     message.channel.id;
 
@@ -505,10 +470,6 @@ async function askAly(
       parts: userParts
     }
   ];
-
-  /* =========================
-     TRY MODELS
-  ========================= */
 
   for (const model of GEMINI_MODELS) {
     try {
@@ -530,18 +491,10 @@ async function askAly(
         `[Gemini] Success: ${model}`
       );
 
-      /* =========================
-         SAVE USER MESSAGE
-      ========================= */
-
       history.push({
         role: "user",
         parts: userParts
       });
-
-      /* =========================
-         SAVE ALY RESPONSE
-      ========================= */
 
       history.push({
         role: "model",
@@ -576,67 +529,59 @@ async function askAly(
    READY
 ========================= */
 
-client.once(
-  "ready",
-  async () => {
+client.once("ready", async () => {
+  setAlyStatus(client);
 
-    /* =========================
-       ALY STATUS
-    ========================= */
+  console.log(
+    `Aly is online as ${client.user.tag}`
+  );
 
-    setAlyStatus(client);
+  console.log(
+    "=============================="
+  );
 
-    console.log(
-      `Aly is online as ${client.user.tag}`
+  console.log(
+    "AI Provider: Google Gemini"
+  );
+
+  console.log(
+    "Memory: Channel-wide"
+  );
+
+  console.log(
+    "Status: Loaded from status.js"
+  );
+
+  console.log(
+    "=============================="
+  );
+
+  try {
+    const rest = new REST({
+      version: "10"
+    }).setToken(
+      process.env.DISCORD_TOKEN
+    );
+
+    await rest.put(
+      Routes.applicationCommands(
+        client.user.id
+      ),
+      {
+        body: commands
+      }
     );
 
     console.log(
-      "=============================="
+      "/aly registered successfully."
     );
-
-    console.log(
-      "AI Provider: Google Gemini"
+  } catch (error) {
+    console.error(
+      "Failed to register /aly:",
+      error
     );
-
-    console.log(
-      "Memory: Channel-wide"
-    );
-
-    console.log(
-      "Status: Loaded from status.js"
-    );
-
-    console.log(
-      "=============================="
-    );
-
-    try {
-      const rest = new REST({
-        version: "10"
-      }).setToken(
-        process.env.DISCORD_TOKEN
-      );
-
-      await rest.put(
-        Routes.applicationCommands(
-          client.user.id
-        ),
-        {
-          body: commands
-        }
-      );
-
-      console.log(
-        "/aly registered successfully."
-      );
-    } catch (error) {
-      console.error(
-        "Failed to register /aly:",
-        error
-      );
-    }
   }
-);
+});
 
 /* =========================
    INTERACTIONS
@@ -646,17 +591,9 @@ client.on(
   "interactionCreate",
   async interaction => {
     try {
-
-      /* =========================
-         /aly
-      ========================= */
-
-      if (
-        interaction.isChatInputCommand()
-      ) {
+      if (interaction.isChatInputCommand()) {
         if (
-          interaction.commandName !==
-          "aly"
+          interaction.commandName !== "aly"
         ) {
           return;
         }
@@ -674,14 +611,9 @@ client.on(
         return;
       }
 
-      /* =========================
-         CHANNEL SELECT
-      ========================= */
-
       if (
         interaction.isChannelSelectMenu() &&
-        interaction.customId ===
-          "aly_channel"
+        interaction.customId === "aly_channel"
       ) {
         const s =
           getSettings(
@@ -700,14 +632,9 @@ client.on(
         return;
       }
 
-      /* =========================
-         MODE SELECT
-      ========================= */
-
       if (
         interaction.isStringSelectMenu() &&
-        interaction.customId ===
-          "aly_mode"
+        interaction.customId === "aly_mode"
       ) {
         const s =
           getSettings(
@@ -726,14 +653,9 @@ client.on(
         return;
       }
 
-      /* =========================
-         APPLY
-      ========================= */
-
       if (
         interaction.isButton() &&
-        interaction.customId ===
-          "aly_apply"
+        interaction.customId === "aly_apply"
       ) {
         const s =
           getSettings(
@@ -761,14 +683,9 @@ client.on(
         return;
       }
 
-      /* =========================
-         START / STOP
-      ========================= */
-
       if (
         interaction.isButton() &&
-        interaction.customId ===
-          "aly_toggle"
+        interaction.customId === "aly_toggle"
       ) {
         const s =
           getSettings(
@@ -785,8 +702,7 @@ client.on(
           return;
         }
 
-        s.enabled =
-          !s.enabled;
+        s.enabled = !s.enabled;
 
         await interaction.update(
           createPanel(
@@ -797,14 +713,9 @@ client.on(
         return;
       }
 
-      /* =========================
-         CLEAR MEMORY
-      ========================= */
-
       if (
         interaction.isButton() &&
-        interaction.customId ===
-          "aly_clear"
+        interaction.customId === "aly_clear"
       ) {
         const s =
           getSettings(
@@ -826,14 +737,9 @@ client.on(
         return;
       }
 
-      /* =========================
-         HELP
-      ========================= */
-
       if (
         interaction.isButton() &&
-        interaction.customId ===
-          "aly_help"
+        interaction.customId === "aly_help"
       ) {
         const helpEmbed =
           new EmbedBuilder()
@@ -868,7 +774,6 @@ client.on(
 
         return;
       }
-
     } catch (error) {
       console.error(
         "[Interaction Error]",
@@ -905,11 +810,6 @@ client.on(
   "messageCreate",
   async message => {
     try {
-
-      /* =========================
-         BASIC CHECKS
-      ========================= */
-
       if (!message.guild) {
         return;
       }
@@ -938,10 +838,6 @@ client.on(
         return;
       }
 
-      /* =========================
-         EMPTY MESSAGE CHECK
-      ========================= */
-
       if (
         !message.content.trim() &&
         message.attachments.size === 0
@@ -949,17 +845,9 @@ client.on(
         return;
       }
 
-      /* =========================
-         TYPING
-      ========================= */
-
       try {
         await message.channel.sendTyping();
       } catch {}
-
-      /* =========================
-         DELAY
-      ========================= */
 
       await new Promise(resolve => {
         setTimeout(
@@ -968,10 +856,40 @@ client.on(
         );
       });
 
-      /* =========================
-         BUILD MESSAGE
-      ========================= */
-
       const userParts =
         await buildUserParts(
-          mes
+          message
+        );
+
+      const reply =
+        await askAly(
+          message,
+          userParts
+        );
+
+      if (!reply) {
+        return;
+      }
+
+      await message.reply({
+        content: reply.slice(0, 2000),
+        allowedMentions: {
+          repliedUser: false
+        }
+      });
+    } catch (error) {
+      console.error(
+        "[Message Error]",
+        error
+      );
+    }
+  }
+);
+
+/* =========================
+   LOGIN
+========================= */
+
+client.login(
+  process.env.DISCORD_TOKEN
+);
