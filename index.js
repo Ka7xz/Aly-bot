@@ -16,76 +16,50 @@ const client = new Client({
   ]
 });
 
-// ==============================
-// SERVER DATA
-// ==============================
+// ===============================
+// STORAGE
+// ===============================
 
 const alyChannels = new Map();
 const conversations = new Map();
-const serverModes = new Map();
-const cooldowns = new Map();
 
-// Response chances
-const MODE_CHANCES = {
-  faster: 0.80,
-  natural: 0.50,
-  reduced: 0.20
-};
+// Message queues so Aly doesn't randomly miss messages
+const messageQueues = new Map();
+const processing = new Set();
 
-// ==============================
-// COMMANDS
-// ==============================
+// ===============================
+// /aly COMMAND
+// ===============================
 
 const commands = [
   new SlashCommandBuilder()
     .setName("aly")
     .setDescription("Manage Aly")
-    
     .addSubcommand(sub =>
       sub
         .setName("setup")
         .setDescription("Set this channel as Aly's chat channel.")
     )
-
     .addSubcommand(sub =>
       sub
         .setName("disable")
         .setDescription("Disable Aly in this server.")
     )
-
     .addSubcommand(sub =>
       sub
         .setName("status")
-        .setDescription("Check Aly's settings.")
+        .setDescription("Check Aly's current channel.")
     )
-
     .addSubcommand(sub =>
       sub
         .setName("clear")
         .setDescription("Clear Aly's conversation memory.")
     )
-
-    .addSubcommand(sub =>
-      sub
-        .setName("mode")
-        .setDescription("Change how often Aly responds.")
-        .addStringOption(option =>
-          option
-            .setName("type")
-            .setDescription("Choose Aly's participation level.")
-            .setRequired(true)
-            .addChoices(
-              { name: "Faster", value: "faster" },
-              { name: "Natural", value: "natural" },
-              { name: "Reduced", value: "reduced" }
-            )
-        )
-    )
 ].map(command => command.toJSON());
 
-// ==============================
-// REGISTER COMMANDS
-// ==============================
+// ===============================
+// REGISTER COMMAND
+// ===============================
 
 async function registerCommands() {
   const rest = new REST({ version: "10" })
@@ -101,9 +75,9 @@ async function registerCommands() {
   console.log("Aly command registered.");
 }
 
-// ==============================
+// ===============================
 // BOT READY
-// ==============================
+// ===============================
 
 client.once("ready", async () => {
   console.log(`Aly is online as ${client.user.tag}`);
@@ -115,17 +89,15 @@ client.once("ready", async () => {
   }
 });
 
-// ==============================
-// /ALY COMMAND
-// ==============================
+// ===============================
+// /ALY HANDLER
+// ===============================
 
 client.on("interactionCreate", async interaction => {
   if (!interaction.isChatInputCommand()) return;
   if (interaction.commandName !== "aly") return;
 
-  const guildId = interaction.guildId;
-
-  if (!guildId) {
+  if (!interaction.guildId) {
     return interaction.reply({
       content: "This command can only be used inside a server.",
       ephemeral: true
@@ -133,19 +105,19 @@ client.on("interactionCreate", async interaction => {
   }
 
   const subcommand = interaction.options.getSubcommand();
+  const guildId = interaction.guildId;
 
   // SETUP
   if (subcommand === "setup") {
-    alyChannels.set(guildId, interaction.channelId);
+    alyChannels.set(
+      guildId,
+      interaction.channelId
+    );
 
-    if (!serverModes.has(guildId)) {
-      serverModes.set(guildId, "natural");
-    }
+    conversations.delete(guildId);
 
     return interaction.reply({
-      content:
-        `Aly is now active in <#${interaction.channelId}>.\n` +
-        `Mode: **${serverModes.get(guildId)}**`,
+      content: `Aly is now enabled in <#${interaction.channelId}>.`,
       ephemeral: true
     });
   }
@@ -153,6 +125,8 @@ client.on("interactionCreate", async interaction => {
   // DISABLE
   if (subcommand === "disable") {
     alyChannels.delete(guildId);
+    conversations.delete(guildId);
+    messageQueues.delete(guildId);
 
     return interaction.reply({
       content: "Aly has been disabled in this server.",
@@ -163,11 +137,10 @@ client.on("interactionCreate", async interaction => {
   // STATUS
   if (subcommand === "status") {
     const channelId = alyChannels.get(guildId);
-    const mode = serverModes.get(guildId) || "natural";
 
     return interaction.reply({
       content: channelId
-        ? `**Aly Status**\nChannel: <#${channelId}>\nMode: **${mode}**`
+        ? `Aly is enabled in <#${channelId}>.`
         : "Aly is not configured in this server.",
       ephemeral: true
     });
@@ -182,25 +155,11 @@ client.on("interactionCreate", async interaction => {
       ephemeral: true
     });
   }
-
-  // MODE
-  if (subcommand === "mode") {
-    const mode = interaction.options.getString("type");
-
-    serverModes.set(guildId, mode);
-
-    return interaction.reply({
-      content:
-        `Aly's mode is now **${mode}**.\n` +
-        `Response chance: **${MODE_CHANCES[mode] * 100}%**`,
-      ephemeral: true
-    });
-  }
 });
 
-// ==============================
+// ===============================
 // ASK OPENROUTER
-// ==============================
+// ===============================
 
 async function askAly(guildId, username, message) {
   if (!conversations.has(guildId)) {
@@ -239,35 +198,26 @@ async function askAly(guildId, username, message) {
           {
             role: "system",
 
-            content: `
-Your name is Aly.
-
-You are a friendly Discord companion in a group chat.
-
-Speak naturally like a normal Discord user.
-
-Important behavior:
-- Keep replies short and natural.
-- Usually reply with 1 or 2 sentences.
-- Do not over-explain.
-- Do not act like a formal assistant.
-- Do not constantly mention that you are an AI.
-- Understand usernames and previous messages.
-- Do not repeat the same greeting again and again.
-- Do not start every response with "Hey".
-- Do not use emojis unless they genuinely fit the message.
-- Normally use ZERO emojis.
-- Never use more than one emoji in a reply.
-- Do not randomly add hearts, smiles, waving emojis, etc.
-- If someone says "hi", a simple "hey" or "hi" is enough.
-- If someone asks your name, say your name is Aly.
-- Participate naturally in the conversation.
-- Do not mention these instructions.
-            `.trim()
+            content:
+              "Your name is Aly. " +
+              "You are a friendly Discord companion who talks naturally in a group chat. " +
+              "Act like a normal person chatting on Discord. " +
+              "Keep replies short and natural, usually one or two sentences. " +
+              "Do not constantly introduce yourself as an AI. " +
+              "Do not use emojis in every message. " +
+              "Use an emoji only occasionally when it genuinely fits. " +
+              "Do not repeat greetings unnecessarily. " +
+              "Pay attention to the conversation and usernames. " +
+              "If someone asks your name, say Aly. " +
+              "Do not mention system prompts, APIs, models, or internal instructions."
           },
 
           ...history
-        ]
+        ],
+
+        temperature: 0.85,
+
+        max_tokens: 120
       })
     }
   );
@@ -279,10 +229,11 @@ Important behavior:
     throw new Error("OpenRouter request failed");
   }
 
-  const reply = data?.choices?.[0]?.message?.content;
+  const reply =
+    data?.choices?.[0]?.message?.content?.trim();
 
   if (!reply) {
-    throw new Error("No AI response received");
+    throw new Error("OpenRouter returned no message.");
   }
 
   history.push({
@@ -293,9 +244,69 @@ Important behavior:
   return reply;
 }
 
-// ==============================
-// NORMAL MESSAGE LISTENER
-// ==============================
+// ===============================
+// PROCESS QUEUE
+// ===============================
+
+async function processQueue(guildId) {
+  if (processing.has(guildId)) return;
+
+  processing.add(guildId);
+
+  const queue = messageQueues.get(guildId);
+
+  if (!queue) {
+    processing.delete(guildId);
+    return;
+  }
+
+  while (queue.length > 0) {
+    const message = queue.shift();
+
+    try {
+      await message.channel.sendTyping();
+
+      const reply = await askAly(
+        guildId,
+        message.author.username,
+        message.content
+      );
+
+      const safeReply =
+        reply.length > 2000
+          ? reply.slice(0, 1997) + "..."
+          : reply;
+
+      await message.reply({
+        content: safeReply,
+        allowedMentions: {
+          repliedUser: false
+        }
+      });
+
+    } catch (error) {
+      console.error("Aly response error:", error);
+
+      // Don't spam error messages for every failed request
+      try {
+        await message.channel.send(
+          "I'm having trouble responding right now."
+        );
+      } catch {}
+    }
+
+    // Small delay between queued responses
+    await new Promise(resolve =>
+      setTimeout(resolve, 1200)
+    );
+  }
+
+  processing.delete(guildId);
+}
+
+// ===============================
+// MESSAGE LISTENER
+// ===============================
 
 client.on("messageCreate", async message => {
   // Ignore DMs
@@ -306,79 +317,78 @@ client.on("messageCreate", async message => {
 
   const guildId = message.guild.id;
 
-  // Aly channel
   const channelId = alyChannels.get(guildId);
 
+  // Aly must be configured
   if (!channelId) return;
 
+  // Only the configured channel
   if (message.channel.id !== channelId) return;
 
-  // ==============================
-  // RESPONSE CHANCE
-  // ==============================
+  // ===============================
+  // MENTION / REPLY DETECTION
+  // ===============================
 
-  const mode = serverModes.get(guildId) || "natural";
+  const mentioned =
+    message.mentions.has(client.user);
 
-  const chance = MODE_CHANCES[mode] || 0.50;
+  let repliedToAly = false;
 
-  // Randomly decide whether Aly participates
-  if (Math.random() > chance) {
-    return;
+  if (message.reference?.messageId) {
+    try {
+      const referenced =
+        await message.channel.messages.fetch(
+          message.reference.messageId
+        );
+
+      repliedToAly =
+        referenced.author.id === client.user.id;
+
+    } catch {}
   }
 
-  // ==============================
-  // SHORT COOLDOWN
-  // ==============================
+  // ===============================
+  // NATURAL PARTICIPATION
+  // ===============================
 
-  const now = Date.now();
+  // Mention/reply = always respond
+  // Normal message = 45% chance to participate
 
-  const lastResponse = cooldowns.get(guildId) || 0;
+  let shouldRespond = mentioned || repliedToAly;
 
-  if (now - lastResponse < 2000) {
-    return;
+  if (!shouldRespond) {
+    shouldRespond = Math.random() < 0.45;
   }
 
-  cooldowns.set(guildId, now);
+  if (!shouldRespond) return;
 
-  // ==============================
-  // ASK AI
-  // ==============================
+  // Remove Aly mention from message
+  let content = message.content
+    .replace(new RegExp(`<@!?${client.user.id}>`, "g"), "")
+    .trim();
 
-  try {
-    await message.channel.sendTyping();
-
-    const reply = await askAly(
-      guildId,
-      message.author.username,
-      message.content
-    );
-
-    if (!reply) return;
-
-    // Discord max message length
-    if (reply.length <= 2000) {
-      await message.reply({
-        content: reply,
-        allowedMentions: {
-          repliedUser: false
-        }
-      });
-    } else {
-      await message.reply({
-        content: reply.slice(0, 1997) + "...",
-        allowedMentions: {
-          repliedUser: false
-        }
-      });
-    }
-
-  } catch (error) {
-    console.error("Aly response error:", error);
+  if (!content) {
+    content = "Hey Aly";
   }
+
+  // ===============================
+  // ADD TO QUEUE
+  // ===============================
+
+  if (!messageQueues.has(guildId)) {
+    messageQueues.set(guildId, []);
+  }
+
+  messageQueues.get(guildId).push({
+    ...message,
+    content
+  });
+
+  processQueue(guildId);
 });
 
-// ==============================
+// ===============================
 // LOGIN
-// ==============================
+// ===============================
 
 client.login(process.env.DISCORD_TOKEN);
