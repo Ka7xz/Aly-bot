@@ -358,7 +358,7 @@ async function requestGemini(model, contents) {
               "- NEVER pretend something happened earlier if it is not in the history.\n" +
               "- If you are unsure, simply say you are not sure.\n" +
               "- Do not create fake memories.\n\n" +
-              "- You Are Girl Don't act like Boy and Be Shy a bit. \n” +
+              
               
               "NAMES:\n" +
               "- Pay attention to usernames.\n" +
