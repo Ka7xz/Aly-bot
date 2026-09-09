@@ -3,7 +3,14 @@ const {
   GatewayIntentBits,
   REST,
   Routes,
-  SlashCommandBuilder
+  SlashCommandBuilder,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  StringSelectMenuBuilder,
+  ChannelSelectMenuBuilder,
+  ChannelType,
+  EmbedBuilder
 } = require("discord.js");
 
 require("dotenv").config();
@@ -16,28 +23,40 @@ const client = new Client({
   ]
 });
 
-// One Aly channel per server
-const alyChannels = new Map();
+/* =========================
+   SERVER SETTINGS
+========================= */
 
-// Recent conversation memory
+const settings = new Map();
 const conversations = new Map();
+const cooldowns = new Map();
+
+function getSettings(guildId) {
+  if (!settings.has(guildId)) {
+    settings.set(guildId, {
+      channelId: null,
+      participation: "natural",
+      enabled: true,
+      timezone: "UTC+05:30"
+    });
+  }
+
+  return settings.get(guildId);
+}
+
+/* =========================
+   SLASH COMMAND
+========================= */
 
 const commands = [
   new SlashCommandBuilder()
-    .setName("alysetup")
-    .setDescription("Set this channel as Aly's chat channel."),
-
-  new SlashCommandBuilder()
-    .setName("alydisable")
-    .setDescription("Disable Aly in this server."),
-
-  new SlashCommandBuilder()
-    .setName("alystatus")
-    .setDescription("Check Aly's current channel.")
+    .setName("aly")
+    .setDescription("Open Aly's settings panel.")
 ].map(command => command.toJSON());
 
 async function registerCommands() {
-  const rest = new REST({ version: "10" }).setToken(process.env.DISCORD_TOKEN);
+  const rest = new REST({ version: "10" })
+    .setToken(process.env.DISCORD_TOKEN);
 
   await rest.put(
     Routes.applicationCommands(process.env.CLIENT_ID),
@@ -47,52 +66,260 @@ async function registerCommands() {
   console.log("Aly slash commands registered.");
 }
 
+/* =========================
+   READY
+========================= */
+
 client.once("ready", async () => {
   console.log(`Aly is online as ${client.user.tag}`);
 
   try {
     await registerCommands();
   } catch (error) {
-    console.error("Failed to register commands:", error);
+    console.error("Command registration error:", error);
   }
 });
+
+/* =========================
+   ALY PANEL
+========================= */
+
+function createPanel(guildId) {
+  const data = getSettings(guildId);
+
+  const channelText = data.channelId
+    ? `<#${data.channelId}>`
+    : "Not configured";
+
+  const participationText = {
+    faster: "⚡ Faster",
+    natural: "💬 Natural",
+    reduced: "🌙 Reduced"
+  }[data.participation];
+
+  const statusText = data.enabled
+    ? "🟢 Enabled"
+    : "🔴 Stopped";
+
+  const embed = new EmbedBuilder()
+    .setTitle("Aly")
+    .setDescription(
+      "Configure how Aly behaves in your server.\n\n" +
+      `**Status:** ${statusText}\n` +
+      `**Channel:** ${channelText}\n` +
+      `**Participation:** ${participationText}\n` +
+      `**Timezone:** ${data.timezone}`
+    );
+
+  const participation = new StringSelectMenuBuilder()
+    .setCustomId("aly_participation")
+    .setPlaceholder("Select participation level")
+    .addOptions(
+      {
+        label: "Faster",
+        description: "Aly participates more often.",
+        value: "faster",
+        emoji: "⚡"
+      },
+      {
+        label: "Natural",
+        description: "Aly decides naturally when to participate.",
+        value: "natural",
+        emoji: "💬"
+      },
+      {
+        label: "Reduced",
+        description: "Aly participates less often.",
+        value: "reduced",
+        emoji: "🌙"
+      }
+    );
+
+  const channel = new ChannelSelectMenuBuilder()
+    .setCustomId("aly_channel")
+    .setPlaceholder("Choose Aly's channel")
+    .setChannelTypes(ChannelType.GuildText);
+
+  const buttons = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId("aly_apply")
+      .setLabel("Apply Settings")
+      .setStyle(ButtonStyle.Success),
+
+    new ButtonBuilder()
+      .setCustomId("aly_stop")
+      .setLabel(data.enabled ? "Stop" : "Start")
+      .setStyle(data.enabled ? ButtonStyle.Danger : ButtonStyle.Success)
+  );
+
+  const buttons2 = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId("aly_clear")
+      .setLabel("Clear Memory")
+      .setStyle(ButtonStyle.Secondary),
+
+    new ButtonBuilder()
+      .setCustomId("aly_help")
+      .setLabel("Help")
+      .setStyle(ButtonStyle.Secondary)
+  );
+
+  return {
+    embeds: [embed],
+    components: [
+      new ActionRowBuilder().addComponents(participation),
+      new ActionRowBuilder().addComponents(channel),
+      buttons,
+      buttons2
+    ]
+  };
+}
+
+/* =========================
+   INTERACTIONS
+========================= */
 
 client.on("interactionCreate", async interaction => {
-  if (!interaction.isChatInputCommand()) return;
 
-  const guildId = interaction.guildId;
+  /* /aly */
+  if (interaction.isChatInputCommand()) {
+    if (interaction.commandName === "aly") {
 
-  if (interaction.commandName === "alysetup") {
-    alyChannels.set(guildId, interaction.channelId);
+      if (!interaction.guild) {
+        return interaction.reply({
+          content: "Aly can only be configured inside a server.",
+          ephemeral: true
+        });
+      }
 
-    await interaction.reply({
-      content: `Aly is now enabled in <#${interaction.channelId}>.`,
-      ephemeral: true
-    });
+      await interaction.reply({
+        ...createPanel(interaction.guildId),
+        ephemeral: true
+      });
+    }
+
+    return;
   }
 
-  if (interaction.commandName === "alydisable") {
-    alyChannels.delete(guildId);
+  /* Participation */
+  if (interaction.isStringSelectMenu()) {
 
-    await interaction.reply({
-      content: "Aly has been disabled in this server.",
-      ephemeral: true
-    });
+    if (interaction.customId === "aly_participation") {
+
+      const data = getSettings(interaction.guildId);
+
+      data.participation = interaction.values[0];
+
+      await interaction.update(
+        createPanel(interaction.guildId)
+      );
+
+      return;
+    }
   }
 
-  if (interaction.commandName === "alystatus") {
-    const channelId = alyChannels.get(guildId);
+  /* Channel */
+  if (interaction.isChannelSelectMenu()) {
 
-    await interaction.reply({
-      content: channelId
-        ? `Aly is enabled in <#${channelId}>.`
-        : "Aly is not configured in this server.",
-      ephemeral: true
-    });
+    if (interaction.customId === "aly_channel") {
+
+      const data = getSettings(interaction.guildId);
+
+      data.channelId = interaction.values[0];
+
+      await interaction.update(
+        createPanel(interaction.guildId)
+      );
+
+      return;
+    }
+  }
+
+  /* Buttons */
+  if (interaction.isButton()) {
+
+    const data = getSettings(interaction.guildId);
+
+    /* Apply */
+    if (interaction.customId === "aly_apply") {
+
+      if (!data.channelId) {
+        return interaction.reply({
+          content: "Please select an Aly channel first.",
+          ephemeral: true
+        });
+      }
+
+      await interaction.reply({
+        content: `Aly settings applied.\nChannel: <#${data.channelId}>`,
+        ephemeral: true
+      });
+
+      return;
+    }
+
+    /* Stop / Start */
+    if (interaction.customId === "aly_stop") {
+
+      data.enabled = !data.enabled;
+
+      await interaction.update(
+        createPanel(interaction.guildId)
+      );
+
+      return;
+    }
+
+    /* Clear memory */
+    if (interaction.customId === "aly_clear") {
+
+      conversations.delete(interaction.guildId);
+
+      await interaction.reply({
+        content: "🧹 Aly's memory for this server has been cleared.",
+        ephemeral: true
+      });
+
+      return;
+    }
+
+    /* Help */
+    if (interaction.customId === "aly_help") {
+
+      await interaction.reply({
+        embeds: [
+          new EmbedBuilder()
+            .setTitle("Aly Help")
+            .setDescription(
+              "**Participation**\n" +
+              "⚡ Faster — Aly talks more often.\n" +
+              "💬 Natural — Aly chooses naturally when to talk.\n" +
+              "🌙 Reduced — Aly talks less often.\n\n" +
+
+              "**Channel**\n" +
+              "Choose the channel where Aly should participate.\n\n" +
+
+              "**Stop**\n" +
+              "Temporarily stops Aly from responding.\n\n" +
+
+              "**Clear Memory**\n" +
+              "Deletes Aly's current conversation memory for this server."
+            )
+        ],
+        ephemeral: true
+      });
+
+      return;
+    }
   }
 });
 
+/* =========================
+   AI
+========================= */
+
 async function askAly(guildId, username, message) {
+
   if (!conversations.has(guildId)) {
     conversations.set(guildId, []);
   }
@@ -104,7 +331,6 @@ async function askAly(guildId, username, message) {
     content: `${username}: ${message}`
   });
 
-  // Keep only the latest 12 messages
   if (history.length > 12) {
     history.splice(0, history.length - 12);
   }
@@ -121,15 +347,19 @@ async function askAly(guildId, username, message) {
       },
       body: JSON.stringify({
         model: "openrouter/free",
+
         messages: [
           {
             role: "system",
             content:
-              "Your name is Aly. You are a friendly Discord AI companion. " +
-              "Talk naturally, casually and like a real Discord user. " +
-              "Keep replies reasonably short. You can use casual language and light humor. " +
-              "Do not constantly say you are an AI. " +
-              "You are participating in a group conversation, so pay attention to usernames and context."
+              "Your name is Aly. " +
+              "You are a friendly Discord AI companion. " +
+              "Talk naturally like a real Discord user. " +
+              "Keep responses short and conversational. " +
+              "Do not constantly mention that you are an AI. " +
+              "You are participating in a group conversation. " +
+              "Pay attention to usernames and previous messages. " +
+              "Do not write huge paragraphs."
           },
           ...history
         ]
@@ -137,17 +367,17 @@ async function askAly(guildId, username, message) {
     }
   );
 
-  const data = await response.json();
+  const result = await response.json();
 
   if (!response.ok) {
-    console.error("OpenRouter error:", data);
+    console.error("OpenRouter:", result);
     throw new Error("OpenRouter request failed");
   }
 
-  const reply = data?.choices?.[0]?.message?.content;
+  const reply = result?.choices?.[0]?.message?.content;
 
   if (!reply) {
-    throw new Error("No response from OpenRouter");
+    throw new Error("AI returned no response");
   }
 
   history.push({
@@ -158,27 +388,72 @@ async function askAly(guildId, username, message) {
   return reply;
 }
 
-// Automatic normal-message listener
-const cooldowns = new Map();
+/* =========================
+   PARTICIPATION
+========================= */
+
+function shouldParticipate(mode) {
+
+  const random = Math.random();
+
+  if (mode === "faster") {
+    return random < 0.70;
+  }
+
+  if (mode === "reduced") {
+    return random < 0.15;
+  }
+
+  return random < 0.35;
+}
+
+/* =========================
+   NORMAL MESSAGES
+========================= */
 
 client.on("messageCreate", async message => {
+
   if (!message.guild) return;
   if (message.author.bot) return;
+  if (!message.content.trim()) return;
 
-  const channelId = alyChannels.get(message.guild.id);
+  const data = getSettings(message.guild.id);
 
-  // Aly only works in the one configured channel
-  if (!channelId || message.channel.id !== channelId) return;
+  if (!data.enabled) return;
 
-  // 8-second cooldown per server
+  if (!data.channelId) return;
+
+  if (message.channel.id !== data.channelId) return;
+
+  /* Aly mentions/replies always get a response */
+  const mentioned =
+    message.mentions.has(client.user.id);
+
+  const repliedToAly =
+    message.reference &&
+    message.mentions.repliedUser &&
+    message.mentions.repliedUser.id === client.user.id;
+
+  /* Ignore some messages randomly */
+  if (!mentioned && !repliedToAly) {
+
+    if (!shouldParticipate(data.participation)) {
+      return;
+    }
+  }
+
+  /* Server cooldown */
   const now = Date.now();
   const cooldown = cooldowns.get(message.guild.id) || 0;
 
-  if (now < cooldown) return;
+  if (now < cooldown && !mentioned && !repliedToAly) {
+    return;
+  }
 
   cooldowns.set(message.guild.id, now + 8000);
 
   try {
+
     await message.channel.sendTyping();
 
     const reply = await askAly(
@@ -187,13 +462,16 @@ client.on("messageCreate", async message => {
       message.content
     );
 
-    // Discord message limit protection
     if (reply.length <= 2000) {
       await message.reply(reply);
     } else {
-      await message.reply(reply.slice(0, 1997) + "...");
+      await message.reply(
+        reply.slice(0, 1997) + "..."
+      );
     }
+
   } catch (error) {
+
     console.error(error);
 
     await message.reply(
@@ -201,5 +479,9 @@ client.on("messageCreate", async message => {
     );
   }
 });
+
+/* =========================
+   LOGIN
+========================= */
 
 client.login(process.env.DISCORD_TOKEN);
