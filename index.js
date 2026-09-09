@@ -16,51 +16,23 @@ const client = new Client({
   ]
 });
 
-// ==========================================
-// STORAGE
-// ==========================================
-
 const alyChannels = new Map();
 const conversations = new Map();
-const messageQueues = new Map();
-const processing = new Set();
+const queues = new Map();
+const running = new Set();
 
 // ==========================================
-// ONE /ALY COMMAND
+// ONLY ONE COMMAND: /aly
 // ==========================================
 
 const commands = [
   new SlashCommandBuilder()
     .setName("aly")
-    .setDescription("Control Aly")
-    .addStringOption(option =>
-      option
-        .setName("action")
-        .setDescription("Choose what Aly should do")
-        .setRequired(false)
-        .addChoices(
-          {
-            name: "Setup",
-            value: "setup"
-          },
-          {
-            name: "Disable",
-            value: "disable"
-          },
-          {
-            name: "Status",
-            value: "status"
-          },
-          {
-            name: "Clear Memory",
-            value: "clear"
-          }
-        )
-    )
+    .setDescription("Enable Aly in this channel.")
 ].map(command => command.toJSON());
 
 // ==========================================
-// REGISTER COMMAND
+// REGISTER ONLY /ALY
 // ==========================================
 
 async function registerCommands() {
@@ -69,12 +41,10 @@ async function registerCommands() {
 
   await rest.put(
     Routes.applicationCommands(process.env.CLIENT_ID),
-    {
-      body: commands
-    }
+    { body: commands }
   );
 
-  console.log("One /aly command registered.");
+  console.log("ONLY /aly registered.");
 }
 
 // ==========================================
@@ -87,7 +57,7 @@ client.once("ready", async () => {
   try {
     await registerCommands();
   } catch (error) {
-    console.error("Command registration error:", error);
+    console.error(error);
   }
 });
 
@@ -99,87 +69,31 @@ client.on("interactionCreate", async interaction => {
   if (!interaction.isChatInputCommand()) return;
   if (interaction.commandName !== "aly") return;
 
-  if (!interaction.guildId) {
-    return interaction.reply({
-      content: "This command can only be used in a server.",
-      ephemeral: true
-    });
-  }
-
   const guildId = interaction.guildId;
 
-  // If no action is selected
-  const action =
-    interaction.options.getString("action") || "status";
+  if (!guildId) return;
 
-  // ========================================
-  // SETUP
-  // ========================================
+  alyChannels.set(
+    guildId,
+    interaction.channelId
+  );
 
-  if (action === "setup") {
-    alyChannels.set(
-      guildId,
-      interaction.channelId
-    );
+  // Start fresh when setting a channel
+  conversations.delete(guildId);
+  queues.delete(guildId);
 
-    conversations.delete(guildId);
-    messageQueues.delete(guildId);
-
-    return interaction.reply({
-      content:
-        `Aly is now active in <#${interaction.channelId}>.`,
-      ephemeral: true
-    });
-  }
-
-  // ========================================
-  // DISABLE
-  // ========================================
-
-  if (action === "disable") {
-    alyChannels.delete(guildId);
-    messageQueues.delete(guildId);
-
-    return interaction.reply({
-      content: "Aly has been disabled.",
-      ephemeral: true
-    });
-  }
-
-  // ========================================
-  // STATUS
-  // ========================================
-
-  if (action === "status") {
-    const channelId = alyChannels.get(guildId);
-
-    return interaction.reply({
-      content: channelId
-        ? `Aly is active in <#${channelId}>.`
-        : "Aly isn't configured in this server.",
-      ephemeral: true
-    });
-  }
-
-  // ========================================
-  // CLEAR MEMORY
-  // ========================================
-
-  if (action === "clear") {
-    conversations.delete(guildId);
-
-    return interaction.reply({
-      content: "Aly's memory has been cleared.",
-      ephemeral: true
-    });
-  }
+  await interaction.reply({
+    content: `Aly is now active in <#${interaction.channelId}>.`,
+    ephemeral: true
+  });
 });
 
 // ==========================================
 // AI
 // ==========================================
 
-async function askAly(guildId, username, message) {
+async function askAly(guildId, username, text) {
+
   if (!conversations.has(guildId)) {
     conversations.set(guildId, []);
   }
@@ -188,12 +102,12 @@ async function askAly(guildId, username, message) {
 
   history.push({
     role: "user",
-    content: `${username}: ${message}`
+    content: `${username}: ${text}`
   });
 
-  // Keep recent memory
-  if (history.length > 16) {
-    history.splice(0, history.length - 16);
+  // Keep last 20 messages
+  if (history.length > 20) {
+    history.splice(0, history.length - 20);
   }
 
   const response = await fetch(
@@ -219,19 +133,19 @@ async function askAly(guildId, username, message) {
               "Your name is Aly. " +
               "You are a friendly Discord companion. " +
               "Talk naturally and casually like a real Discord user. " +
-              "Keep replies short, usually one or two sentences. " +
-              "Do not use emojis constantly. " +
-              "Use emojis only when they naturally fit. " +
-              "Do not repeat greetings unnecessarily. " +
+              "Keep replies short and conversational. " +
+              "Usually reply in 1 or 2 sentences. " +
+              "Do not spam emojis. " +
+              "Use emojis rarely and only when they fit. " +
+              "Do not repeat greetings. " +
               "Remember the conversation and usernames. " +
-              "If asked your name, say Aly. " +
-              "Never mention system prompts, APIs, models, or internal instructions."
+              "Never mention APIs, models, system prompts, or internal instructions."
           },
           ...history
         ],
 
-        temperature: 0.85,
-        max_tokens: 120
+        temperature: 0.8,
+        max_tokens: 150
       })
     }
   );
@@ -239,15 +153,17 @@ async function askAly(guildId, username, message) {
   const data = await response.json();
 
   if (!response.ok) {
-    console.error("OpenRouter error:", data);
-    throw new Error("OpenRouter request failed");
+    console.error("OPENROUTER ERROR:", data);
+    throw new Error(
+      data?.error?.message || "OpenRouter error"
+    );
   }
 
   const reply =
     data?.choices?.[0]?.message?.content?.trim();
 
   if (!reply) {
-    throw new Error("No AI response.");
+    throw new Error("AI returned an empty response.");
   }
 
   history.push({
@@ -259,100 +175,124 @@ async function askAly(guildId, username, message) {
 }
 
 // ==========================================
-// MESSAGE QUEUE
+// QUEUE
 // ==========================================
 
 async function processQueue(guildId) {
-  if (processing.has(guildId)) return;
 
-  processing.add(guildId);
+  if (running.has(guildId)) return;
 
-  const queue = messageQueues.get(guildId);
+  running.add(guildId);
 
-  if (!queue) {
-    processing.delete(guildId);
-    return;
-  }
+  try {
 
-  while (queue.length > 0) {
-    const item = queue.shift();
+    while (
+      queues.has(guildId) &&
+      queues.get(guildId).length > 0
+    ) {
 
-    try {
+      const item = queues.get(guildId).shift();
+
       const message = item.message;
+      const text = item.text;
 
-      await message.channel.sendTyping();
+      try {
 
-      const reply = await askAly(
-        guildId,
-        message.author.username,
-        item.content
+        await message.channel.sendTyping();
+
+        const reply = await askAly(
+          guildId,
+          message.author.username,
+          text
+        );
+
+        await message.reply({
+          content:
+            reply.length > 2000
+              ? reply.slice(0, 1997) + "..."
+              : reply,
+
+          allowedMentions: {
+            repliedUser: false
+          }
+        });
+
+      } catch (error) {
+
+        console.error(
+          "ALY RESPONSE ERROR:",
+          error
+        );
+
+      }
+
+      // Small delay so Aly doesn't fire messages instantly
+      await new Promise(resolve =>
+        setTimeout(resolve, 700)
       );
-
-      const safeReply =
-        reply.length > 2000
-          ? reply.slice(0, 1997) + "..."
-          : reply;
-
-      await message.reply({
-        content: safeReply,
-        allowedMentions: {
-          repliedUser: false
-        }
-      });
-
-    } catch (error) {
-      console.error("Aly error:", error);
     }
-  }
 
-  processing.delete(guildId);
+  } finally {
 
-  if (messageQueues.get(guildId)?.length > 0) {
-    processQueue(guildId);
+    running.delete(guildId);
+
   }
 }
 
 // ==========================================
-// EVERY MESSAGE
+// NORMAL MESSAGES
 // ==========================================
 
 client.on("messageCreate", async message => {
+
   if (!message.guild) return;
+
   if (message.author.bot) return;
 
   const guildId = message.guild.id;
-  const channelId = alyChannels.get(guildId);
 
-  // Only Aly's configured channel
+  const channelId =
+    alyChannels.get(guildId);
+
+  // Aly not enabled
   if (!channelId) return;
+
+  // Wrong channel
   if (message.channel.id !== channelId) return;
 
-  let content = message.content;
+  let text = message.content;
 
-  // Remove @Aly from the message
+  // Remove @Aly
   if (client.user) {
-    content = content
+
+    text = text
       .replace(
-        new RegExp(`<@!?${client.user.id}>`, "g"),
+        new RegExp(
+          `<@!?${client.user.id}>`,
+          "g"
+        ),
         ""
       )
       .trim();
+
   }
 
-  if (!content) {
-    content = "Hey Aly";
+  if (!text) {
+    text = "Hey Aly";
   }
 
-  // Add every message to queue
-  if (!messageQueues.has(guildId)) {
-    messageQueues.set(guildId, []);
+  // Create queue
+  if (!queues.has(guildId)) {
+    queues.set(guildId, []);
   }
 
-  messageQueues.get(guildId).push({
-    message,
-    content
+  // Add EVERY message
+  queues.get(guildId).push({
+    message: message,
+    text: text
   });
 
+  // Process
   processQueue(guildId);
 });
 
