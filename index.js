@@ -30,6 +30,7 @@ const commands = [
   new SlashCommandBuilder()
     .setName("aly")
     .setDescription("Open Aly's configuration panel")
+    .toJSON()
 ];
 
 function getSettings(guildId) {
@@ -44,27 +45,28 @@ function getSettings(guildId) {
   return settings.get(guildId);
 }
 
-function delayFor(mode) {
+function getDelay(mode) {
   if (mode === "faster") return 1000;
   if (mode === "reduced") return 1500;
   return 1250;
 }
 
-function modeText(mode) {
+function getModeName(mode) {
   if (mode === "faster") return "Faster";
   if (mode === "reduced") return "Reduced";
   return "Natural";
 }
 
-function makePanel(guildId) {
+function createPanel(guildId) {
   const s = getSettings(guildId);
 
   const embed = new EmbedBuilder()
-    .setTitle("Aly")
+    .setTitle("Aly Configuration")
     .setDescription(
-      `Configure Aly for this server.\n\n` +
-      `**Channel:** ${s.channelId ? `<#${s.channelId}>` : "Not selected"}\n` +
-      `**Participation:** ${modeText(s.mode)}\n` +
+      `**Channel:** ${
+        s.channelId ? `<#${s.channelId}>` : "Not selected"
+      }\n` +
+      `**Participation:** ${getModeName(s.mode)}\n` +
       `**Status:** ${s.enabled ? "Running" : "Stopped"}`
     )
     .setColor(0x87ceeb);
@@ -76,44 +78,43 @@ function makePanel(guildId) {
 
   const modeMenu = new StringSelectMenuBuilder()
     .setCustomId("aly_mode")
-    .setPlaceholder("Select participation")
-    .addOptions(
+    .setPlaceholder("Select participation mode")
+    .addOptions([
       {
         label: "Faster",
-        description: "Aly responds after 1 second",
-        value: "faster",
-        default: s.mode === "faster"
+        description: "1 second response delay",
+        value: "faster"
       },
       {
         label: "Natural",
-        description: "Aly responds after 1.25 seconds",
-        value: "natural",
-        default: s.mode === "natural"
+        description: "1.25 second response delay",
+        value: "natural"
       },
       {
         label: "Reduced",
-        description: "Aly responds after 1.5 seconds",
-        value: "reduced",
-        default: s.mode === "reduced"
+        description: "1.5 second response delay",
+        value: "reduced"
       }
-    );
+    ]);
 
-  const apply = new ButtonBuilder()
+  const applyButton = new ButtonBuilder()
     .setCustomId("aly_apply")
     .setLabel("Apply Settings")
     .setStyle(ButtonStyle.Primary);
 
-  const toggle = new ButtonBuilder()
+  const toggleButton = new ButtonBuilder()
     .setCustomId("aly_toggle")
     .setLabel(s.enabled ? "Stop" : "Start")
-    .setStyle(s.enabled ? ButtonStyle.Danger : ButtonStyle.Success);
+    .setStyle(
+      s.enabled ? ButtonStyle.Danger : ButtonStyle.Success
+    );
 
-  const clear = new ButtonBuilder()
+  const clearButton = new ButtonBuilder()
     .setCustomId("aly_clear")
     .setLabel("Clear Memory")
     .setStyle(ButtonStyle.Secondary);
 
-  const help = new ButtonBuilder()
+  const helpButton = new ButtonBuilder()
     .setCustomId("aly_help")
     .setLabel("Help")
     .setStyle(ButtonStyle.Secondary);
@@ -124,16 +125,16 @@ function makePanel(guildId) {
       new ActionRowBuilder().addComponents(channelMenu),
       new ActionRowBuilder().addComponents(modeMenu),
       new ActionRowBuilder().addComponents(
-        apply,
-        toggle,
-        clear,
-        help
+        applyButton,
+        toggleButton,
+        clearButton,
+        helpButton
       )
     ]
   };
 }
 
-async function askAI(message) {
+async function askAly(message) {
   const key = `${message.guild.id}:${message.author.id}`;
 
   if (!memory.has(key)) {
@@ -157,7 +158,8 @@ async function askAI(message) {
       {
         method: "POST",
         headers: {
-          "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
+          "Authorization":
+            `Bearer ${process.env.OPENROUTER_API_KEY}`,
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
@@ -167,8 +169,8 @@ async function askAI(message) {
               role: "system",
               content:
                 "You are Aly, a friendly AI Discord companion. " +
-                "Speak naturally and casually like a real Discord user. " +
-                "Keep normal replies short, usually 1 or 2 sentences. " +
+                "Talk naturally and casually like a real Discord user. " +
+                "Keep replies short, usually 1 or 2 sentences. " +
                 "Answer the user's actual message. " +
                 "Remember recent conversation. " +
                 "Do not use excessive emojis. " +
@@ -192,7 +194,13 @@ async function askAI(message) {
     }
 
     const answer =
-      data?.choices?.[0]?.message?.content?.trim();
+      data &&
+      data.choices &&
+      data.choices[0] &&
+      data.choices[0].message &&
+      data.choices[0].message.content
+        ? String(data.choices[0].message.content).trim()
+        : "";
 
     if (!answer) {
       console.error("Invalid AI response:", data);
@@ -210,17 +218,18 @@ async function askAI(message) {
 
     return answer;
   } catch (error) {
-    console.error("AI request error:", error);
+    console.error("AI error:", error);
     return "Something went wrong while I was thinking.";
   }
 }
 
 client.once("ready", async () => {
-  console.log(`Aly online: ${client.user.tag}`);
+  console.log(`Aly online as ${client.user.tag}`);
 
   try {
-    const rest = new REST({ version: "10" })
-      .setToken(process.env.DISCORD_TOKEN);
+    const rest = new REST({ version: "10" }).setToken(
+      process.env.DISCORD_TOKEN
+    );
 
     await rest.put(
       Routes.applicationCommands(client.user.id),
@@ -229,9 +238,9 @@ client.once("ready", async () => {
       }
     );
 
-    console.log("/aly registered");
+    console.log("/aly registered successfully");
   } catch (error) {
-    console.error("Slash command error:", error);
+    console.error("Command registration error:", error);
   }
 });
 
@@ -248,9 +257,12 @@ client.on("interactionCreate", async interaction => {
         return;
       }
 
-      await interaction.deferReply({ ephemeral: true });
+      await interaction.deferReply({
+        ephemeral: true
+      });
+
       await interaction.editReply(
-        makePanel(interaction.guild.id)
+        createPanel(interaction.guild.id)
       );
 
       return;
@@ -265,7 +277,7 @@ client.on("interactionCreate", async interaction => {
       s.channelId = interaction.values[0];
 
       await interaction.update(
-        makePanel(interaction.guild.id)
+        createPanel(interaction.guild.id)
       );
 
       return;
@@ -280,7 +292,7 @@ client.on("interactionCreate", async interaction => {
       s.mode = interaction.values[0];
 
       await interaction.update(
-        makePanel(interaction.guild.id)
+        createPanel(interaction.guild.id)
       );
 
       return;
@@ -302,7 +314,7 @@ client.on("interactionCreate", async interaction => {
       s.enabled = true;
 
       await interaction.update(
-        makePanel(interaction.guild.id)
+        createPanel(interaction.guild.id)
       );
 
       return;
@@ -320,7 +332,7 @@ client.on("interactionCreate", async interaction => {
       s.enabled = !s.enabled;
 
       await interaction.update(
-        makePanel(interaction.guild.id)
+        createPanel(interaction.guild.id)
       );
 
       return;
@@ -352,8 +364,9 @@ client.on("interactionCreate", async interaction => {
               "**Faster** — 1 second\n" +
               "**Natural** — 1.25 seconds\n" +
               "**Reduced** — 1.5 seconds\n\n" +
-              "Select a channel, choose a mode and press **Apply Settings**. " +
-              "Aly will automatically respond to messages in that channel."
+              "Select a channel, choose a mode, then press " +
+              "**Apply Settings**. Aly will automatically respond " +
+              "to messages in that channel."
             )
             .setColor(0x87ceeb)
         ],
@@ -377,7 +390,9 @@ client.on("messageCreate", async message => {
     if (!message.guild) return;
     if (message.author.bot) return;
 
-    const content = message.content?.trim();
+    const content = message.content
+      ? message.content.trim()
+      : "";
 
     if (!content) return;
 
@@ -390,10 +405,10 @@ client.on("messageCreate", async message => {
     await message.channel.sendTyping();
 
     await new Promise(resolve => {
-      setTimeout(resolve, delayFor(s.mode));
+      setTimeout(resolve, getDelay(s.mode));
     });
 
-    const answer = await askAI(message);
+    const answer = await askAly(message);
 
     await message.reply({
       content: answer,
