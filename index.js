@@ -15,7 +15,6 @@ const {
 
 require("dotenv").config();
 
-const fs = require("fs");
 const { setAlyStatus } = require("./status");
 
 /* =========================
@@ -56,7 +55,7 @@ const client = new Client({
 const settings = new Map();
 
 /*
- * Memory is now PER ALY CHANNEL,
+ * Memory is PER ALY CHANNEL,
  * not per user.
  *
  * This lets Aly understand the
@@ -299,11 +298,6 @@ async function buildUserParts(message) {
       continue;
     }
 
-    /*
-     * Keep inline images reasonably small.
-     * Gemini supports inline image data for
-     * smaller requests.
-     */
     if (attachment.size > 8 * 1024 * 1024) {
       parts.push({
         text:
@@ -506,7 +500,6 @@ async function askAly(
 
   const contents = [
     ...history,
-
     {
       role: "user",
       parts: userParts
@@ -559,10 +552,6 @@ async function askAly(
         ]
       });
 
-      /*
-       * Keep 20 messages = roughly
-       * 10 conversation turns.
-       */
       while (history.length > 20) {
         history.shift();
       }
@@ -590,6 +579,13 @@ async function askAly(
 client.once(
   "ready",
   async () => {
+
+    /* =========================
+       ALY STATUS
+    ========================= */
+
+    setAlyStatus(client);
+
     console.log(
       `Aly is online as ${client.user.tag}`
     );
@@ -604,6 +600,10 @@ client.once(
 
     console.log(
       "Memory: Channel-wide"
+    );
+
+    console.log(
+      "Status: Loaded from status.js"
     );
 
     console.log(
@@ -646,6 +646,7 @@ client.on(
   "interactionCreate",
   async interaction => {
     try {
+
       /* =========================
          /aly
       ========================= */
@@ -867,6 +868,7 @@ client.on(
 
         return;
       }
+
     } catch (error) {
       console.error(
         "[Interaction Error]",
@@ -903,6 +905,7 @@ client.on(
   "messageCreate",
   async message => {
     try {
+
       /* =========================
          BASIC CHECKS
       ========================= */
@@ -935,10 +938,10 @@ client.on(
         return;
       }
 
-      /*
-       * Ignore completely empty
-       * messages without attachments.
-       */
+      /* =========================
+         EMPTY MESSAGE CHECK
+      ========================= */
+
       if (
         !message.content.trim() &&
         message.attachments.size === 0
@@ -971,4 +974,4 @@ client.on(
 
       const userParts =
         await buildUserParts(
-      
+          mes
