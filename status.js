@@ -3,9 +3,8 @@ function setAlyStatus(client) {
     status: "online",
     activities: [
       {
-        name: "Favorite collectible?",
-        type: 4,
-        state: "Favorite collectible?"
+        name: "/aly",
+        type: 3
       }
     ]
   });
