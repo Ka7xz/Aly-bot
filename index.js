@@ -210,7 +210,7 @@ function createPanel(guildId) {
   const supportButton = new ButtonBuilder()
     .setLabel("Support Server")
     .setStyle(ButtonStyle.Link)
-    .setURL("https://discord.com/channels/1541197389237325956/1541197390139228222");
+    .setURL("https://discord.gg/dWZvhnSxbZ");
 
   const supportRow = new ActionRowBuilder()
     .addComponents(supportButton);
