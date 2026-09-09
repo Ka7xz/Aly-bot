@@ -243,7 +243,6 @@ const commands = [
 
 async function buildUserParts(message) {
   const parts = [];
-
   const text = message.content?.trim();
 
   if (text) {
@@ -534,26 +533,6 @@ client.once("ready", async () => {
 
   console.log(
     `Aly is online as ${client.user.tag}`
-  );
-
-  console.log(
-    "=============================="
-  );
-
-  console.log(
-    "AI Provider: Google Gemini"
-  );
-
-  console.log(
-    "Memory: Channel-wide"
-  );
-
-  console.log(
-    "Status: Loaded from status.js"
-  );
-
-  console.log(
-    "=============================="
   );
 
   try {
