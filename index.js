@@ -16,6 +16,7 @@ const {
 require("dotenv").config();
 
 const fs = require("fs");
+const { setAlyStatus } = require("./status");
 
 /* =========================
    ENV CHECK
