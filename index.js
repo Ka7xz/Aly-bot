@@ -65,16 +65,6 @@ async function registerCommands() {
   const rest = new REST({ version: "10" })
     .setToken(process.env.DISCORD_TOKEN);
 
-  /*
-    PUT replaces the entire global command list.
-    Therefore the old:
-    /alysetup
-    /alydisable
-    /alystatus
-
-    will be removed.
-  */
-
   await rest.put(
     Routes.applicationCommands(process.env.CLIENT_ID),
     {
@@ -86,7 +76,7 @@ async function registerCommands() {
 }
 
 /* =========================
-   BOT READY
+   READY
 ========================= */
 
 client.once("ready", async () => {
@@ -100,7 +90,7 @@ client.once("ready", async () => {
 });
 
 /* =========================
-   PANEL
+   ALY PANEL
 ========================= */
 
 function createPanel(guildId) {
@@ -210,7 +200,7 @@ function createPanel(guildId) {
 
 client.on("interactionCreate", async interaction => {
 
-  /* ---------- /aly ---------- */
+  /* /aly */
 
   if (
     interaction.isChatInputCommand() &&
@@ -219,7 +209,8 @@ client.on("interactionCreate", async interaction => {
 
     if (!interaction.guild) {
       return interaction.reply({
-        content: "This command can only be used inside a server.",
+        content:
+          "This command can only be used inside a server.",
         ephemeral: true
       });
     }
@@ -232,16 +223,18 @@ client.on("interactionCreate", async interaction => {
     return;
   }
 
-  /* ---------- PARTICIPATION ---------- */
+  /* PARTICIPATION */
 
   if (
     interaction.isStringSelectMenu() &&
     interaction.customId === "aly_participation"
   ) {
 
-    const data = getSettings(interaction.guildId);
+    const data =
+      getSettings(interaction.guildId);
 
-    data.participation = interaction.values[0];
+    data.participation =
+      interaction.values[0];
 
     await interaction.update(
       createPanel(interaction.guildId)
@@ -250,16 +243,18 @@ client.on("interactionCreate", async interaction => {
     return;
   }
 
-  /* ---------- CHANNEL ---------- */
+  /* CHANNEL */
 
   if (
     interaction.isChannelSelectMenu() &&
     interaction.customId === "aly_channel"
   ) {
 
-    const data = getSettings(interaction.guildId);
+    const data =
+      getSettings(interaction.guildId);
 
-    data.channelId = interaction.values[0];
+    data.channelId =
+      interaction.values[0];
 
     await interaction.update(
       createPanel(interaction.guildId)
@@ -268,11 +263,12 @@ client.on("interactionCreate", async interaction => {
     return;
   }
 
-  /* ---------- BUTTONS ---------- */
+  /* BUTTONS */
 
   if (interaction.isButton()) {
 
-    const data = getSettings(interaction.guildId);
+    const data =
+      getSettings(interaction.guildId);
 
     /* APPLY */
 
@@ -280,7 +276,8 @@ client.on("interactionCreate", async interaction => {
 
       if (!data.channelId) {
         return interaction.reply({
-          content: "Select a channel first.",
+          content:
+            "Select a channel first.",
           ephemeral: true
         });
       }
@@ -314,7 +311,9 @@ client.on("interactionCreate", async interaction => {
 
     if (interaction.customId === "aly_clear") {
 
-      conversations.delete(interaction.guildId);
+      conversations.delete(
+        interaction.guildId
+      );
 
       await interaction.reply({
         content:
@@ -329,26 +328,24 @@ client.on("interactionCreate", async interaction => {
 
     if (interaction.customId === "aly_help") {
 
-      const helpEmbed = new EmbedBuilder()
-        .setTitle("Aly Help")
-        .setDescription(
-          "**Participation**\n" +
-          "Faster: Aly joins conversations more often.\n" +
-          "Natural: Aly chooses when to participate.\n" +
-          "Reduced: Aly joins conversations less often.\n\n" +
+      const helpEmbed =
+        new EmbedBuilder()
+          .setTitle("Aly Help")
+          .setDescription(
+            "**Participation**\n" +
+            "Faster — Aly joins conversations more often.\n" +
+            "Natural — Aly chooses when to participate.\n" +
+            "Reduced — Aly joins conversations less often.\n\n" +
 
-          "**Channel**\n" +
-          "Choose the channel where Aly should talk.\n\n" +
+            "**Channel**\n" +
+            "Choose the channel where Aly should talk.\n\n" +
 
-          "**Start / Stop**\n" +
-          "Temporarily enable or disable Aly.\n\n" +
+            "**Start / Stop**\n" +
+            "Temporarily enable or disable Aly.\n\n" +
 
-          "**Clear Memory**\n" +
-          "Deletes Aly's current conversation memory for this server.\n\n" +
-
-          "**Mention Aly**\n" +
-          "Mentioning or replying to Aly makes her respond."
-        );
+            "**Clear Memory**\n" +
+            "Deletes Aly's current conversation memory for this server."
+          );
 
       await interaction.reply({
         embeds: [helpEmbed],
@@ -361,7 +358,7 @@ client.on("interactionCreate", async interaction => {
 });
 
 /* =========================
-   REMOVE EMOJIS
+   REMOVE EMOJIS FROM AI
 ========================= */
 
 function removeEmojis(text) {
@@ -388,12 +385,16 @@ async function askAly(
     conversations.set(guildId, []);
   }
 
-  const history = conversations.get(guildId);
+  const history =
+    conversations.get(guildId);
 
   history.push({
     role: "user",
-    content: `${username}: ${message}`
+    content:
+      `${username}: ${message}`
   });
+
+  /* Keep latest 12 messages */
 
   if (history.length > 12) {
     history.splice(
@@ -409,10 +410,13 @@ async function askAly(
 
       headers: {
         "Content-Type": "application/json",
+
         "Authorization":
           `Bearer ${process.env.OPENROUTER_API_KEY}`,
+
         "HTTP-Referer":
           "https://discord.com/",
+
         "X-Title":
           "Aly Discord Bot"
       },
@@ -431,7 +435,7 @@ async function askAly(
 
               "You are a natural Discord companion.\n" +
 
-              "Talk casually and naturally, like a real person in a Discord conversation.\n" +
+              "Talk casually and naturally like a real person in a Discord conversation.\n" +
 
               "Keep replies short and conversational.\n" +
 
@@ -439,14 +443,18 @@ async function askAly(
 
               "Do not constantly mention that you are an AI.\n" +
 
-              "Remember the recent conversation and usernames.\n\n" +
+              "Remember recent conversation context and usernames.\n\n" +
 
-              "IMPORTANT STYLE RULES:\n" +
+              "STYLE:\n" +
 
-              "Do NOT use emojis.\n" +
-              "Do NOT add emojis to greetings.\n" +
-              "Do NOT add emojis to every sentence.\n" +
+              "Do not use emojis.\n" +
+
+              "Do not add emojis to greetings.\n" +
+
+              "Do not add emojis to every sentence.\n" +
+
               "Avoid excessive excitement.\n" +
+
               "Use normal punctuation and casual Discord language.\n" +
 
               "Respond naturally based on the conversation."
@@ -458,9 +466,11 @@ async function askAly(
     }
   );
 
-  const result = await response.json();
+  const result =
+    await response.json();
 
   if (!response.ok) {
+
     console.error(
       "OpenRouter error:",
       result
@@ -480,8 +490,10 @@ async function askAly(
     );
   }
 
-  /* Remove AI-generated emojis */
-  reply = removeEmojis(reply);
+  /* Remove emojis */
+
+  reply =
+    removeEmojis(reply);
 
   history.push({
     role: "assistant",
@@ -497,7 +509,8 @@ async function askAly(
 
 function shouldParticipate(mode) {
 
-  const random = Math.random();
+  const random =
+    Math.random();
 
   if (mode === "faster") {
     return random < 0.70;
@@ -507,11 +520,13 @@ function shouldParticipate(mode) {
     return random < 0.15;
   }
 
+  /* Natural */
+
   return random < 0.35;
 }
 
 /* =========================
-   NORMAL DISCORD MESSAGES
+   NORMAL MESSAGES
 ========================= */
 
 client.on("messageCreate", async message => {
@@ -535,52 +550,35 @@ client.on("messageCreate", async message => {
     return;
   }
 
-  /* Mention Aly */
-  const mentioned =
-    message.mentions.has(
-      client.user.id
-    );
-
-  /* Reply to Aly */
-  const repliedToAly =
-    message.reference &&
-    message.mentions.repliedUser &&
-    message.mentions.repliedUser.id ===
-      client.user.id;
-
   /*
-    Mentioning/replying to Aly
-    always gets a response.
+    Aly does NOT require:
+    - a mention
+    - a reply
+    - a special prefix
+
+    She simply decides whether
+    to participate.
   */
 
   if (
-    !mentioned &&
-    !repliedToAly
+    !shouldParticipate(
+      data.participation
+    )
   ) {
-
-    if (
-      !shouldParticipate(
-        data.participation
-      )
-    ) {
-      return;
-    }
+    return;
   }
 
-  /* Cooldown */
+  /* Server cooldown */
 
-  const now = Date.now();
+  const now =
+    Date.now();
 
   const cooldown =
     cooldowns.get(
       message.guild.id
     ) || 0;
 
-  if (
-    now < cooldown &&
-    !mentioned &&
-    !repliedToAly
-  ) {
+  if (now < cooldown) {
     return;
   }
 
@@ -620,9 +618,7 @@ client.on("messageCreate", async message => {
       error
     );
 
-    await message.reply(
-      "I couldn't respond right now. Please try again."
-    );
+    /* Don't send an error message to the channel. */
   }
 });
 
