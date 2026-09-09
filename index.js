@@ -70,7 +70,6 @@ function getSettings(guildId) {
 function getDelay(mode) {
   if (mode === "faster") return 1000;
   if (mode === "reduced") return 1500;
-
   return 1250;
 }
 
@@ -115,6 +114,7 @@ function createPanel(guildId) {
   const embed = new EmbedBuilder()
     .setTitle("Aly Configuration")
     .setDescription(
+      "Configure how Aly behaves in this server.\n\n" +
       `**Channel:** ${channelText}\n` +
       `**Participation:** ${modeText}\n` +
       `**Status:** ${statusText}`
@@ -780,6 +780,7 @@ client.on(
           ephemeral: true
         });
       }
+
     } catch (error) {
       console.error(
         "[Interaction Error]",
@@ -871,6 +872,7 @@ client.on(
           repliedUser: false
         }
       });
+
     } catch (error) {
       console.error(
         "[Message Error]",
