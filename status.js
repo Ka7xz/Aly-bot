@@ -3,8 +3,9 @@ function setAlyStatus(client) {
     status: "online",
     activities: [
       {
-        name: "/aly",
-        type: 3
+        name: "Custom Status",
+        state: "lost in the chat.",
+        type: 4
       }
     ]
   });
