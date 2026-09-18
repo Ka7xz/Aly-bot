@@ -215,11 +215,11 @@ async function sendAlyResponse(
       });
 
       await message.channel.send({
-        content: chunk,
-        allowedMentions: {
-          parse: []
-        }
-      });
+      content: chunk,
+      allowedMentions: {
+    parse: []
+  }
+});
     } catch (error) {
       console.error(
         "[Aly] Failed to send response:",
