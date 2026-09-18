@@ -1,10 +1,14 @@
 function setAlyStatus(client) {
+  if (!client.user) return;
+
   client.user.setPresence({
     status: "online",
+
     activities: [
       {
-        name: "Kinda Busy In Chats",
-        type: 0
+        name: "Custom Status",
+        state: "FEEL FREE TO TALK WITH ME",
+        type: 4
       }
     ]
   });
