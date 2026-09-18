@@ -214,10 +214,10 @@ async function sendAlyResponse(
         setTimeout(resolve, delay);
       });
 
-      await message.channel.send({
-      content: chunk,
-      allowedMentions: {
-    parse: []
+      message.reply({
+  content: chunk,
+  allowedMentions: {
+    repliedUser: false
   }
 });
     } catch (error) {
