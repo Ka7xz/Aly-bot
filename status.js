@@ -7,7 +7,7 @@ function setAlyStatus(client) {
     activities: [
       {
         name: "Custom Status",
-        state: "FEEL FREE TO TALK WITH ME",
+        state: "FEEL FREE TO TALK",
         type: 4
       }
     ]
