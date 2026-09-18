@@ -1073,4 +1073,351 @@ client.on(
               "You need Administrator permission to use `/aly`.",
             ephemeral: true
           });
-  
+  }
+
+        if (
+          interaction.customId?.startsWith(
+            "aly_"
+          )
+        ) {
+          return interaction.reply({
+            content:
+              "You need Administrator permission to change Aly's settings.",
+            ephemeral: true
+          });
+        }
+      }
+
+      /* =========================
+         /ALY
+      ========================= */
+
+      if (
+        interaction.isChatInputCommand()
+      ) {
+        if (
+          interaction.commandName !==
+          "aly"
+        ) {
+          return;
+        }
+
+        await interaction.reply({
+          ...createPanel(
+            interaction.guild.id
+          ),
+          ephemeral: true
+        });
+
+        return;
+      }
+
+      /* =========================
+         CHANNEL SELECT
+      ========================= */
+
+      if (
+        interaction.isChannelSelectMenu() &&
+        interaction.customId ===
+          "aly_channel"
+      ) {
+        const s =
+          getSettings(
+            interaction.guild.id
+          );
+
+        s.channelId =
+          interaction.values[0];
+
+        await interaction.update(
+          createPanel(
+            interaction.guild.id
+          )
+        );
+
+        return;
+      }
+
+      /* =========================
+         MODE SELECT
+      ========================= */
+
+      if (
+        interaction.isStringSelectMenu() &&
+        interaction.customId ===
+          "aly_mode"
+      ) {
+        const s =
+          getSettings(
+            interaction.guild.id
+          );
+
+        s.mode =
+          interaction.values[0];
+
+        await interaction.update(
+          createPanel(
+            interaction.guild.id
+          )
+        );
+
+        return;
+      }
+
+      /* =========================
+         APPLY SETTINGS
+      ========================= */
+
+      if (
+        interaction.isButton() &&
+        interaction.customId ===
+          "aly_apply"
+      ) {
+        const s =
+          getSettings(
+            interaction.guild.id
+          );
+
+        if (!s.channelId) {
+          return interaction.reply({
+            content:
+              "Select a channel first.",
+            ephemeral: true
+          });
+        }
+
+        s.enabled = true;
+
+        await interaction.update(
+          createPanel(
+            interaction.guild.id
+          )
+        );
+
+        return;
+      }
+
+      /* =========================
+         START / STOP
+      ========================= */
+
+      if (
+        interaction.isButton() &&
+        interaction.customId ===
+          "aly_toggle"
+      ) {
+        const s =
+          getSettings(
+            interaction.guild.id
+          );
+
+        if (!s.channelId) {
+          return interaction.reply({
+            content:
+              "Select a channel first.",
+            ephemeral: true
+          });
+        }
+
+        s.enabled =
+          !s.enabled;
+
+        await interaction.update(
+          createPanel(
+            interaction.guild.id
+          )
+        );
+
+        return;
+      }
+
+      /* =========================
+         CLEAR MEMORY
+      ========================= */
+
+      if (
+        interaction.isButton() &&
+        interaction.customId ===
+          "aly_clear"
+      ) {
+        const s =
+          getSettings(
+            interaction.guild.id
+          );
+
+        if (s.channelId) {
+          clearChannelMemory(
+            s.channelId
+          );
+        }
+
+        return interaction.reply({
+          content:
+            "Aly's memory has been cleared.",
+          ephemeral: true
+        });
+      }
+
+      /* =========================
+         HELP
+      ========================= */
+
+      if (
+        interaction.isButton() &&
+        interaction.customId ===
+          "aly_help"
+      ) {
+        const helpEmbed =
+          new EmbedBuilder()
+            .setTitle("Aly Help")
+            .setDescription(
+              "**Channel**\n" +
+              "Choose the channel where Aly responds.\n\n" +
+
+              "**Faster**\n" +
+              "Fast human-like typing speed.\n\n" +
+
+              "**Natural**\n" +
+              "Average human typing speed.\n\n" +
+
+              "**Reduced**\n" +
+              "Slow beginner typing speed.\n\n" +
+
+              "**Apply Settings**\n" +
+              "Applies the selected channel and starts Aly.\n\n" +
+
+              "**Start / Stop**\n" +
+              "Turns Aly on or off.\n\n" +
+
+              "**Clear Memory**\n" +
+              "Clears Aly's conversation memory."
+            )
+            .setColor("#87CEEB");
+
+        return interaction.reply({
+          embeds: [helpEmbed],
+          ephemeral: true
+        });
+      }
+
+    } catch (error) {
+      console.error(
+        "[Interaction Error]",
+        error
+      );
+
+      try {
+        if (
+          interaction.replied ||
+          interaction.deferred
+        ) {
+          await interaction.followUp({
+            content:
+              "Something went wrong.",
+            ephemeral: true
+          });
+        } else {
+          await interaction.reply({
+            content:
+              "Something went wrong.",
+            ephemeral: true
+          });
+        }
+      } catch {}
+    }
+  }
+);
+
+/* =========================
+   MESSAGES
+========================= */
+
+client.on(
+  "messageCreate",
+  async message => {
+    try {
+      if (!message.guild) {
+        return;
+      }
+
+      if (message.author.bot) {
+        return;
+      }
+
+      const s =
+        getSettings(
+          message.guild.id
+        );
+
+      if (!s.enabled) {
+        return;
+      }
+
+      if (!s.channelId) {
+        return;
+      }
+
+      if (
+        message.channel.id !==
+        s.channelId
+      ) {
+        return;
+      }
+
+      /*
+        Build the complete user message
+        and image data first.
+      */
+
+      const userParts =
+        await buildUserParts(
+          message
+        );
+
+      /*
+        Ask Gemini first.
+
+        Nothing is sent until Gemini has
+        generated the complete response.
+      */
+
+      const reply =
+        await askAly(
+          message,
+          userParts
+        );
+
+      if (!reply) {
+        return;
+      }
+
+      /*
+        Only AFTER the complete response
+        is ready, Aly starts "typing".
+
+        This makes the delay proportional
+        to the actual message length.
+      */
+
+      await sendAlyResponse(
+        message,
+        reply,
+        s.mode
+      );
+
+    } catch (error) {
+      console.error(
+        "[Message Error]",
+        error
+      );
+    }
+  }
+);
+
+/* =========================
+   LOGIN
+========================= */
+
+client.login(
+  process.env.DISCORD_TOKEN
+);
