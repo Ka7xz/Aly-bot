@@ -215,9 +215,9 @@ async function sendAlyResponse(
       });
 
       message.reply({
-  content: chunk,
-  allowedMentions: {
-    repliedUser: false
+     content: chunk,
+     allowedMentions: {
+     repliedUser: false
   }
 });
     } catch (error) {
