@@ -55,6 +55,11 @@ const client = new Client({
 const settings = new Map();
 const memory = new Map();
 
+/*
+  Keep your model list here.
+  If one model is unavailable, Aly automatically
+  tries the next one.
+*/
 const GEMINI_MODELS = [
   "gemini-3.8-flash",
   "gemini-3.7-flash",
@@ -178,7 +183,8 @@ async function sendAlyResponse(
   response,
   mode
 ) {
-  const chunks = splitMessage(response);
+  const chunks =
+    splitMessage(response);
 
   if (!chunks.length) {
     return;
@@ -195,7 +201,7 @@ async function sendAlyResponse(
         setTimeout(resolve, delay);
       });
 
-      await message.reply({
+      message.reply({
         content: chunk,
         allowedMentions: {
           repliedUser: false
@@ -267,7 +273,7 @@ function createPanel(guildId) {
         {
           label: "Faster",
           description:
-            "Fast typing while keeping replies complete",
+           "Quick typing for fast and responsive conversations",
           value: "faster",
           default:
             s.mode === "faster"
@@ -275,15 +281,15 @@ function createPanel(guildId) {
         {
           label: "Natural",
           description:
-            "Average human-like typing speed",
+           "Smooth typing with a natural response pace",
           value: "natural",
           default:
             s.mode === "natural"
         },
         {
-          label: "Slow",
+          label: "Slower",
           description:
-            "Slower beginner-like typing speed",
+            "Smooth and relaxed typing speed",
           value: "slow",
           default:
             s.mode === "slow"
@@ -735,8 +741,8 @@ client.once(
   "ready",
   async () => {
 
-    // NO automatic status here.
-    // Alystatus controls the status.
+    // OLD AUTOMATIC STATUS SYSTEM
+    setAlyStatus(client);
 
     console.log(
       `Aly is online as ${client.user.tag}`
@@ -983,13 +989,13 @@ client.on(
             "Aly's memory has been cleared.",
           ephemeral: true
         });
-      }
+     }
 
       /* =========================
          HELP
       ========================= */
 
-     if (
+      if (
         interaction.isButton() &&
         interaction.customId ===
           "aly_help"
@@ -1004,13 +1010,13 @@ client.on(
               "Choose the channel where Aly responds.\n\n" +
 
               "**Faster**\n" +
-              "Fast human-like typing while keeping the full response.\n\n" +
+              "Quick typing speed for faster responses.\n\n" +
 
               "**Natural**\n" +
-              "Average human-like typing speed.\n\n" +
+              "Natural typing speed for smooth conversations.\n\n" +
 
               "**Slow**\n" +
-              "Slower beginner-like typing speed.\n\n" +
+              "Slower responses with a smooth, natural typing pace.\n\n" +
 
               "**Apply Settings**\n" +
               "Applies the selected channel and starts Aly.\n\n" +
@@ -1064,125 +1070,11 @@ client.on(
 /* =========================
    MESSAGES
 ========================= */
-client.on("messageCreate", async message => {
-  console.log(
-    "[MESSAGE TEST]",
-    message.author.tag,
-    message.content
-  );
-
-  if (
-    message.content
-      .toLowerCase()
-      .startsWith("alystatus")
-  ) {
-    return message.reply("Alystatus command detected!");
-  }
-
-  // YOUR EXISTING CODE...
-});
 
 client.on(
   "messageCreate",
   async message => {
     try {
-
-      /* =========================
-         ALYSTATUS — OWNER ONLY
-      ========================= */
-
-      if (
-        message.content
-          .toLowerCase()
-          .startsWith("alystatus")
-      ) {
-
-        const ALY_OWNER_ID =
-          process.env.ALY_OWNER_ID;
-
-        if (
-          message.author.id !==
-          ALY_OWNER_ID
-        ) {
-          return message.reply(
-            "❌ Only the bot owner can use this command."
-          );
-        }
-
-        const args =
-          message.content
-            .trim()
-            .split(/\s+/);
-
-        if (
-          args[1]?.toLowerCase() !==
-          "set"
-        ) {
-          return message.reply(
-            "❌ Usage: `Alystatus set <type> <name>`"
-          );
-        }
-
-        const type =
-          args[2]?.toLowerCase();
-
-        const name =
-          args
-            .slice(3)
-            .join(" ");
-
-        if (!type || !name) {
-          return message.reply(
-            "❌ Usage: `Alystatus set <type> <name>`"
-          );
-        }
-
-        const success =
-          setAlyStatus(
-            message.client,
-            type,
-            name
-          );
-
-        if (!success) {
-          return message.reply(
-            "❌ Invalid type!\n\n" +
-            "Available types:\n" +
-            "`playing`\n" +
-            "`watching`\n" +
-            "`listening`\n" +
-            "`streaming`\n" +
-            "`custom`"
-          );
-        }
-
-        const embed =
-          new EmbedBuilder()
-            .setColor("#87CEEB")
-            .setTitle(
-              "Bot status updated"
-            )
-            .setDescription(
-              `**Type:** ${type}\n` +
-              `**Template:** ${name}\n` +
-              `**Live preview:** ${name}\n` +
-              `**Status:** online`
-            )
-            .setFooter({
-              text:
-                `Updated by ${message.author.username}`
-            })
-            .setTimestamp();
-
-        return message.reply({
-          embeds: [embed]
-        });
-      }
-
-      /* =========================
-         NORMAL ALY SYSTEM
-      ========================= */
-
       if (!message.guild) {
         return;
       }
