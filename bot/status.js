@@ -1,52 +1,101 @@
-const { ActivityType } = require("discord.js");
+const {
+  ActivityType
+} = require("discord.js");
+
+let currentStatus = 0;
+let rotationInterval = null;
 
 /* =========================
-   SET BOT STATUS
+   GET TOTAL MEMBER COUNT
 ========================= */
 
-function setAlyStatus(client, type, name) {
-  if (!client.user) return false;
+function getMemberCount(client) {
+  let count = 0;
 
-  const types = {
-    playing: ActivityType.Playing,
-    watching: ActivityType.Watching,
-    listening: ActivityType.Listening,
-    streaming: ActivityType.Streaming,
-    custom: ActivityType.Custom
-  };
-
-  type = type.toLowerCase();
-
-  if (!types[type]) {
-    return false;
+  for (const guild of client.guilds.cache.values()) {
+    count += guild.memberCount || 0;
   }
 
-  let activity;
+  return count;
+}
 
-  if (type === "custom") {
-    activity = {
+/* =========================
+   UPDATE STATUS
+========================= */
+
+function updateStatus(client) {
+  if (!client.user) return;
+
+  const serverCount =
+    client.guilds.cache.size;
+
+  const memberCount =
+    getMemberCount(client);
+
+  const statuses = [
+    {
       type: ActivityType.Custom,
       name: "Custom Status",
-      state: name
-    };
-  } else {
-    activity = {
-      type: types[type],
-      name: name
-    };
-  }
+      state: "FEEL FREE TO TALK"
+    },
+
+    {
+      type: ActivityType.Watching,
+      name: `${serverCount} Servers`
+    },
+
+    {
+      type: ActivityType.Listening,
+      name: `${memberCount} Members`
+    }
+  ];
+
+  const activity =
+    statuses[currentStatus];
 
   client.user.setPresence({
     status: "online",
-    activities: [activity]
+    activities: [
+      activity
+    ]
   });
 
   console.log(
-    `[STATUS] ${type} - ${name}`
+    `[STATUS] ${currentStatus + 1}/${statuses.length} - ${
+      activity.state || activity.name
+    }`
   );
 
-  return true;
+  currentStatus =
+    (currentStatus + 1) %
+    statuses.length;
 }
+
+/* =========================
+   START STATUS ROTATION
+========================= */
+
+function setAlyStatus(client) {
+  if (!client.user) return;
+
+  if (rotationInterval) {
+    clearInterval(rotationInterval);
+  }
+
+  currentStatus = 0;
+
+  // Set the first status immediately
+  updateStatus(client);
+
+  // Change every 10 seconds
+  rotationInterval = setInterval(() => {
+    updateStatus(client);
+  }, 10000);
+}
+
+/* =========================
+   EXPORT
+========================= */
 
 module.exports = {
   setAlyStatus
