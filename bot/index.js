@@ -1176,3 +1176,86 @@ client.on(
 client.login(
   process.env.DISCORD_TOKEN
 );
+
+const { EmbedBuilder } = require("discord.js");
+const { setAlyStatus } = require("./status");
+
+const ALY_OWNER_ID = "YOUR_DISCORD_USER_ID";
+
+if (message.content.toLowerCase().startsWith("alystatus")) {
+
+  // =========================
+  // BOT OWNER ONLY
+  // =========================
+
+  if (message.author.id !== ALY_OWNER_ID) {
+    return message.reply(
+      "❌ Only the bot owner can use this command."
+    );
+  }
+
+  const args = message.content.trim().split(/\s+/);
+
+  // =========================
+  // CHECK COMMAND
+  // =========================
+
+  if (args[1]?.toLowerCase() !== "set") {
+    return message.reply(
+      "❌ Usage: `Alystatus set <type> <name>`"
+    );
+  }
+
+  const type = args[2]?.toLowerCase();
+  const name = args.slice(3).join(" ");
+
+  if (!type || !name) {
+    return message.reply(
+      "❌ Usage: `Alystatus set <type> <name>`"
+    );
+  }
+
+  // =========================
+  // SET STATUS
+  // =========================
+
+  const success = setAlyStatus(
+    message.client,
+    type,
+    name
+  );
+
+  if (!success) {
+    return message.reply(
+      "❌ Invalid type!\n\n" +
+      "Available types:\n" +
+      "`playing`\n" +
+      "`watching`\n" +
+      "`listening`\n" +
+      "`streaming`\n" +
+      "`custom`"
+    );
+  }
+
+  // =========================
+  // SUCCESS EMBED
+  // =========================
+
+  const embed = new EmbedBuilder()
+    .setColor("#87CEEB")
+    .setTitle("Bot status updated")
+    .setDescription(
+      `**Type:** ${type}\n` +
+      `**Template:** ${name}\n` +
+      `**Live preview:** ${name}\n` +
+      `**Status:** dnd`
+    )
+    .setFooter({
+      text: `Updated by ${message.author.username}`
+    })
+    .setTimestamp();
+
+  return message.reply({
+    embeds: [embed]
+  });
+}
