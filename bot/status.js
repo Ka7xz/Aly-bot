@@ -16,11 +16,8 @@ function getMemberCount(client) {
 function updateStatus(client) {
   if (!client.user) return;
 
-  const serverCount =
-    client.guilds.cache.size;
-
-  const memberCount =
-    getMemberCount(client);
+  const serverCount = client.guilds.cache.size;
+  const memberCount = getMemberCount(client);
 
   const statuses = [
     {
@@ -36,20 +33,19 @@ function updateStatus(client) {
       name: `${memberCount} Members`
     },
     {
-      type: ActivityType.Streaming,
+      type: ActivityType.Custom,
       state: "Powered by Aly"
     }
   ];
 
-  const status =
-    statuses[currentStatus];
+  const status = statuses[currentStatus];
 
   if (status.type === ActivityType.Custom) {
     client.user.setPresence({
       status: "online",
       activities: [
         {
-          name: "Custom Status",
+          name: "Aly",
           state: status.state,
           type: ActivityType.Custom
         }
