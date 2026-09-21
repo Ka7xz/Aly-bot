@@ -1,5 +1,7 @@
+const { ActivityType } = require("discord.js");
+
 module.exports = (client) => {
-  const updateStatus = () => {
+  function updateStatus() {
     const members = client.guilds.cache.reduce(
       (total, guild) => total + guild.memberCount,
       0
@@ -10,19 +12,17 @@ module.exports = (client) => {
       activities: [
         {
           name: "FEEL FREE TO TALK",
-          type: 4,
-          state: "FEEL FREE TO TALK"
+          type: ActivityType.Playing
         },
         {
-          name: `${membercount} Members`,
-          type: 2
+          name: `${members} Members`,
+          type: ActivityType.Listening
         }
       ]
     });
-  };
+  }
 
   updateStatus();
 
-  // Update member count every 5 minutes
   setInterval(updateStatus, 5 * 60 * 1000);
 };
