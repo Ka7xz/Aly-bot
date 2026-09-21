@@ -16,7 +16,7 @@ const {
 require("dotenv").config();
 
 const { setAlyStatus } = require("./status");
-
+const updateStatus = require("./status");
 /* =========================
    ENVIRONMENT
 ========================= */
