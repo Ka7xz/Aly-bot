@@ -1,5 +1,9 @@
 const { ActivityType } = require("discord.js");
 
+/* =========================
+   SET BOT STATUS
+========================= */
+
 function setAlyStatus(client, type, name) {
   if (!client.user) return false;
 
@@ -13,17 +17,23 @@ function setAlyStatus(client, type, name) {
 
   type = type.toLowerCase();
 
-  if (!types[type]) return false;
+  if (!types[type]) {
+    return false;
+  }
 
   let activity;
 
+  // CUSTOM STATUS
   if (type === "custom") {
     activity = {
       type: ActivityType.Custom,
       name: "Custom Status",
       state: name
     };
-  } else {
+  }
+
+  // NORMAL STATUS
+  else {
     activity = {
       type: types[type],
       name: name
@@ -31,7 +41,7 @@ function setAlyStatus(client, type, name) {
   }
 
   client.user.setPresence({
-    status: "online",
+    status: "dnd",
     activities: [activity]
   });
 
