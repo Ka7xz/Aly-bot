@@ -94,11 +94,11 @@ function getTypingDelay(text, mode) {
   let charactersPerSecond;
 
   if (mode === "faster") {
-    charactersPerSecond = 55;
+    charactersPerSecond = 70;
   } else if (mode === "slow") {
-    charactersPerSecond = 15;
+    charactersPerSecond = 30;
   } else {
-    charactersPerSecond = 35;
+    charactersPerSecond = 50;
   }
 
   const calculated =
