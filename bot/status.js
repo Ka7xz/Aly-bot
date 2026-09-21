@@ -1,96 +1,46 @@
-const {
-  ActivityType
-} = require("discord.js");
-
-let currentStatus = 0;
-let rotationInterval = null;
+const { ActivityType } = require("discord.js");
 
 /* =========================
-   GET TOTAL MEMBER COUNT
+   SET BOT STATUS
 ========================= */
 
-function getMemberCount(client) {
-  let count = 0;
+function setAlyStatus(client, type, name) {
+  if (!client.user) return false;
 
-  for (const guild of client.guilds.cache.values()) {
-    count += guild.memberCount || 0;
+  const types = {
+    playing: ActivityType.Playing,
+    watching: ActivityType.Watching,
+    listening: ActivityType.Listening,
+    streaming: ActivityType.Streaming,
+    custom: ActivityType.Custom
+  };
+
+  type = type.toLowerCase();
+
+  if (!types[type]) {
+    return false;
   }
 
-  return count;
-}
+  const activity = {
+    type: types[type],
+    name: name
+  };
 
-/* =========================
-   UPDATE STATUS
-========================= */
-
-function updateStatus(client) {
-  if (!client.user) return;
-
-  const serverCount =
-    client.guilds.cache.size;
-
-  const memberCount =
-    getMemberCount(client);
-
-  const statuses = [
-    {
-      type: ActivityType.Custom,
-      name: "Custom Status",
-      state: "FEEL FREE TO TALK"
-    },
-
-    {
-      type: ActivityType.Watching,
-      name: `${serverCount} Servers`
-    },
-
-    {
-      type: ActivityType.Listening,
-      name: `${memberCount} Members`
-    }
-  ];
-
-  const activity =
-    statuses[currentStatus];
+  // Custom status uses "state"
+  if (type === "custom") {
+    activity.state = name;
+  }
 
   client.user.setPresence({
-    status: "online",
-    activities: [
-      activity
-    ]
+    status: "dnd",
+    activities: [activity]
   });
 
   console.log(
-    `[STATUS] ${currentStatus + 1}/${statuses.length} - ${
-      activity.state || activity.name
-    }`
+    `[STATUS] ${type} - ${name}`
   );
 
-  currentStatus =
-    (currentStatus + 1) %
-    statuses.length;
-}
-
-/* =========================
-   START STATUS ROTATION
-========================= */
-
-function setAlyStatus(client) {
-  if (!client.user) return;
-
-  if (rotationInterval) {
-    clearInterval(rotationInterval);
-  }
-
-  currentStatus = 0;
-
-  // Set the first status immediately
-  updateStatus(client);
-
-  // Change every 10 seconds
-  rotationInterval = setInterval(() => {
-    updateStatus(client);
-  }, 10000);
+  return true;
 }
 
 /* =========================
