@@ -41,7 +41,9 @@ function setAlyStatus(client, type, name) {
     activities: [activity]
   });
 
-  console.log(`[STATUS] ${type} - ${name}`);
+  console.log(
+    `[STATUS] ${type} - ${name}`
+  );
 
   return true;
 }
