@@ -23,17 +23,13 @@ function setAlyStatus(client, type, name) {
 
   let activity;
 
-  // CUSTOM STATUS
   if (type === "custom") {
     activity = {
       type: ActivityType.Custom,
       name: "Custom Status",
       state: name
     };
-  }
-
-  // NORMAL STATUS
-  else {
+  } else {
     activity = {
       type: types[type],
       name: name
@@ -45,10 +41,16 @@ function setAlyStatus(client, type, name) {
     activities: [activity]
   });
 
-  console.log(`[STATUS] ${type} - ${name}`);
+  console.log(
+    `[STATUS] ${type} - ${name}`
+  );
 
   return true;
 }
+
+/* =========================
+   EXPORT
+========================= */
 
 module.exports = {
   setAlyStatus
