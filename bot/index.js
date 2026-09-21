@@ -742,8 +742,7 @@ client.once(
   async () => {
 
     // OLD AUTOMATIC STATUS SYSTEM
-    setAlyStatus(client);
-
+    
     console.log(
       `Aly is online as ${client.user.tag}`
     );
