@@ -1064,6 +1064,23 @@ client.on(
 /* =========================
    MESSAGES
 ========================= */
+client.on("messageCreate", async message => {
+  console.log(
+    "[MESSAGE TEST]",
+    message.author.tag,
+    message.content
+  );
+
+  if (
+    message.content
+      .toLowerCase()
+      .startsWith("alystatus")
+  ) {
+    return message.reply("Alystatus command detected!");
+  }
+
+  // YOUR EXISTING CODE...
+});
 
 client.on(
   "messageCreate",
