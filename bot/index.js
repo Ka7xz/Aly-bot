@@ -735,10 +735,8 @@ client.once(
   "ready",
   async () => {
 
-    // IMPORTANT:
-    // Do NOT call setAlyStatus(client)
-    // here. Status is now controlled
-    // by Alystatus command.
+    // NO automatic status here.
+    // Alystatus controls the status.
 
     console.log(
       `Aly is online as ${client.user.tag}`
@@ -986,72 +984,12 @@ client.on(
           ephemeral: true
         });
       }
-/* =========================
-         START / STOP
-      ========================= */
-
-      if (
-        interaction.isButton() &&
-        interaction.customId ===
-          "aly_toggle"
-      ) {
-        const s =
-          getSettings(
-            interaction.guild.id
-          );
-
-        if (!s.channelId) {
-          return interaction.reply({
-            content:
-              "Select a channel first.",
-            ephemeral: true
-          });
-        }
-
-        s.enabled =
-          !s.enabled;
-
-        await interaction.update(
-          createPanel(
-            interaction.guild.id
-          )
-        );
-
-        return;
-      }
-
-      /* =========================
-         CLEAR MEMORY
-      ========================= */
-
-      if (
-        interaction.isButton() &&
-        interaction.customId ===
-          "aly_clear"
-      ) {
-        const s =
-          getSettings(
-            interaction.guild.id
-          );
-
-        if (s.channelId) {
-          clearChannelMemory(
-            s.channelId
-          );
-        }
-
-        return interaction.reply({
-          content:
-            "Aly's memory has been cleared.",
-          ephemeral: true
-        });
-      }
 
       /* =========================
          HELP
       ========================= */
 
-      if (
+     if (
         interaction.isButton() &&
         interaction.customId ===
           "aly_help"
@@ -1141,6 +1079,7 @@ client.on(
           .toLowerCase()
           .startsWith("alystatus")
       ) {
+
         const ALY_OWNER_ID =
           process.env.ALY_OWNER_ID;
 
@@ -1149,7 +1088,7 @@ client.on(
           ALY_OWNER_ID
         ) {
           return message.reply(
-            "Only the bot owner can use this command."
+            "❌ Only the bot owner can use this command."
           );
         }
 
@@ -1163,7 +1102,7 @@ client.on(
           "set"
         ) {
           return message.reply(
-            "Usage: `Alystatus set <type> <name>`"
+            "❌ Usage: `Alystatus set <type> <name>`"
           );
         }
 
@@ -1177,7 +1116,7 @@ client.on(
 
         if (!type || !name) {
           return message.reply(
-            " Usage: `Alystatus set <type> <name>`"
+            "❌ Usage: `Alystatus set <type> <name>`"
           );
         }
 
@@ -1190,7 +1129,7 @@ client.on(
 
         if (!success) {
           return message.reply(
-            " Invalid type!\n\n" +
+            "❌ Invalid type!\n\n" +
             "Available types:\n" +
             "`playing`\n" +
             "`watching`\n" +
@@ -1210,7 +1149,7 @@ client.on(
               `**Type:** ${type}\n` +
               `**Template:** ${name}\n` +
               `**Live preview:** ${name}\n` +
-              `**Status:** dnd`
+              `**Status:** online`
             )
             .setFooter({
               text:
@@ -1224,7 +1163,7 @@ client.on(
       }
 
       /* =========================
-         NORMAL ALY MESSAGE SYSTEM
+         NORMAL ALY SYSTEM
       ========================= */
 
       if (!message.guild) {
@@ -1296,4 +1235,3 @@ client.on(
 client.login(
   process.env.DISCORD_TOKEN
 );
-      
