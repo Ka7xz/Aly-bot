@@ -55,11 +55,6 @@ const client = new Client({
 const settings = new Map();
 const memory = new Map();
 
-/*
-  Keep your model list here.
-  If one model is unavailable, Aly automatically
-  tries the next one.
-*/
 const GEMINI_MODELS = [
   "gemini-3.8-flash",
   "gemini-3.7-flash",
@@ -88,12 +83,6 @@ function getSettings(guildId) {
    TYPING SPEED
 ========================= */
 
-/*
-  Faster  = fast but still readable
-  Natural = normal human-like speed
-  Slow    = beginner typing speed
-*/
-
 function getTypingDelay(text, mode) {
   const length = Math.max(text.length, 1);
 
@@ -110,13 +99,6 @@ function getTypingDelay(text, mode) {
   const calculated =
     (length / charactersPerSecond) * 1000;
 
-  /*
-    Minimum delay makes Aly feel like she is
-    actually typing.
-
-    Maximum delay prevents very long replies
-    from taking forever.
-  */
   return Math.min(
     Math.max(calculated, 700),
     12000
@@ -196,8 +178,7 @@ async function sendAlyResponse(
   response,
   mode
 ) {
-  const chunks =
-    splitMessage(response);
+  const chunks = splitMessage(response);
 
   if (!chunks.length) {
     return;
@@ -214,12 +195,12 @@ async function sendAlyResponse(
         setTimeout(resolve, delay);
       });
 
-      message.reply({
-     content: chunk,
-     allowedMentions: {
-     repliedUser: false
-  }
-});
+      await message.reply({
+        content: chunk,
+        allowedMentions: {
+          repliedUser: false
+        }
+      });
     } catch (error) {
       console.error(
         "[Aly] Failed to send response:",
@@ -663,11 +644,6 @@ async function requestGemini(
     return null;
   }
 
-  /*
-    If Gemini reports MAX_TOKENS, the response may
-    have been cut by the model. We still return the
-    available text instead of sending nothing.
-  */
   if (
     candidate.finishReason ===
     "MAX_TOKENS"
@@ -719,10 +695,6 @@ async function askAly(
         continue;
       }
 
-      /*
-        Only save the conversation after
-        Gemini successfully answered.
-      */
       history.push({
         role: "user",
         parts: userParts
@@ -737,10 +709,6 @@ async function askAly(
         ]
       });
 
-      /*
-        Keep the last 20 entries
-        = approximately 10 conversation turns.
-      */
       while (
         history.length > 20
       ) {
@@ -766,7 +734,11 @@ async function askAly(
 client.once(
   "ready",
   async () => {
-    setAlyStatus(client);
+
+    // IMPORTANT:
+    // Do NOT call setAlyStatus(client)
+    // here. Status is now controlled
+    // by Alystatus command.
 
     console.log(
       `Aly is online as ${client.user.tag}`
@@ -809,6 +781,7 @@ client.on(
   "interactionCreate",
   async interaction => {
     try {
+
       /* =========================
          ADMIN ONLY
       ========================= */
@@ -981,12 +954,72 @@ client.on(
         await interaction.update(
           createPanel(
             interaction.guild.id
-            )
+          )
         );
 
         return;
       }
-      
+
+      /* =========================
+         CLEAR MEMORY
+      ========================= */
+
+      if (
+        interaction.isButton() &&
+        interaction.customId ===
+          "aly_clear"
+      ) {
+        const s =
+          getSettings(
+            interaction.guild.id
+          );
+
+        if (s.channelId) {
+          clearChannelMemory(
+            s.channelId
+          );
+        }
+
+        return interaction.reply({
+          content:
+            "Aly's memory has been cleared.",
+          ephemeral: true
+        });
+      }
+/* =========================
+         START / STOP
+      ========================= */
+
+      if (
+        interaction.isButton() &&
+        interaction.customId ===
+          "aly_toggle"
+      ) {
+        const s =
+          getSettings(
+            interaction.guild.id
+          );
+
+        if (!s.channelId) {
+          return interaction.reply({
+            content:
+              "Select a channel first.",
+            ephemeral: true
+          });
+        }
+
+        s.enabled =
+          !s.enabled;
+
+        await interaction.update(
+          createPanel(
+            interaction.guild.id
+          )
+        );
+
+        return;
+      }
+
       /* =========================
          CLEAR MEMORY
       ========================= */
@@ -1061,6 +1094,7 @@ client.on(
           ephemeral: true
         });
       }
+
     } catch (error) {
       console.error(
         "[Interaction Error]",
@@ -1097,6 +1131,102 @@ client.on(
   "messageCreate",
   async message => {
     try {
+
+      /* =========================
+         ALYSTATUS — OWNER ONLY
+      ========================= */
+
+      if (
+        message.content
+          .toLowerCase()
+          .startsWith("alystatus")
+      ) {
+        const ALY_OWNER_ID =
+          process.env.ALY_OWNER_ID;
+
+        if (
+          message.author.id !==
+          ALY_OWNER_ID
+        ) {
+          return message.reply(
+            "Only the bot owner can use this command."
+          );
+        }
+
+        const args =
+          message.content
+            .trim()
+            .split(/\s+/);
+
+        if (
+          args[1]?.toLowerCase() !==
+          "set"
+        ) {
+          return message.reply(
+            "Usage: `Alystatus set <type> <name>`"
+          );
+        }
+
+        const type =
+          args[2]?.toLowerCase();
+
+        const name =
+          args
+            .slice(3)
+            .join(" ");
+
+        if (!type || !name) {
+          return message.reply(
+            " Usage: `Alystatus set <type> <name>`"
+          );
+        }
+
+        const success =
+          setAlyStatus(
+            message.client,
+            type,
+            name
+          );
+
+        if (!success) {
+          return message.reply(
+            " Invalid type!\n\n" +
+            "Available types:\n" +
+            "`playing`\n" +
+            "`watching`\n" +
+            "`listening`\n" +
+            "`streaming`\n" +
+            "`custom`"
+          );
+        }
+
+        const embed =
+          new EmbedBuilder()
+            .setColor("#87CEEB")
+            .setTitle(
+              "Bot status updated"
+            )
+            .setDescription(
+              `**Type:** ${type}\n` +
+              `**Template:** ${name}\n` +
+              `**Live preview:** ${name}\n` +
+              `**Status:** dnd`
+            )
+            .setFooter({
+              text:
+                `Updated by ${message.author.username}`
+            })
+            .setTimestamp();
+
+        return message.reply({
+          embeds: [embed]
+        });
+      }
+
+      /* =========================
+         NORMAL ALY MESSAGE SYSTEM
+      ========================= */
+
       if (!message.guild) {
         return;
       }
@@ -1125,17 +1255,11 @@ client.on(
         return;
       }
 
-      /*
-        Build text + image parts.
-      */
       const userParts =
         await buildUserParts(
           message
         );
 
-      /*
-        Ask Gemini.
-      */
       const reply =
         await askAly(
           message,
@@ -1150,16 +1274,12 @@ client.on(
         return;
       }
 
-      /*
-        Send the complete response.
-        Long responses are automatically
-        split below Discord's 2000-character limit.
-      */
       await sendAlyResponse(
         message,
         reply,
         s.mode
       );
+
     } catch (error) {
       console.error(
         "[Message Error]",
@@ -1176,86 +1296,4 @@ client.on(
 client.login(
   process.env.DISCORD_TOKEN
 );
-
-const { EmbedBuilder } = require("discord.js");
-const { setAlyStatus } = require("./status");
-
-const ALY_OWNER_ID = "YOUR_DISCORD_USER_ID";
-
-if (message.content.toLowerCase().startsWith("alystatus")) {
-
-  // =========================
-  // BOT OWNER ONLY
-  // =========================
-
-  if (message.author.id !== ALY_OWNER_ID) {
-    return message.reply(
-      "❌ Only the bot owner can use this command."
-    );
-  }
-
-  const args = message.content.trim().split(/\s+/);
-
-  // =========================
-  // CHECK COMMAND
-  // =========================
-
-  if (args[1]?.toLowerCase() !== "set") {
-    return message.reply(
-      "❌ Usage: `Alystatus set <type> <name>`"
-    );
-  }
-
-  const type = args[2]?.toLowerCase();
-  const name = args.slice(3).join(" ");
-
-  if (!type || !name) {
-    return message.reply(
-      "❌ Usage: `Alystatus set <type> <name>`"
-    );
-  }
-
-  // =========================
-  // SET STATUS
-  // =========================
-
-  const success = setAlyStatus(
-    message.client,
-    type,
-    name
-  );
-
-  if (!success) {
-    return message.reply(
-      "❌ Invalid type!\n\n" +
-      "Available types:\n" +
-      "`playing`\n" +
-      "`watching`\n" +
-      "`listening`\n" +
-      "`streaming`\n" +
-      "`custom`"
-    );
-  }
-
-  // =========================
-  // SUCCESS EMBED
-  // =========================
-
-  const embed = new EmbedBuilder()
-    .setColor("#87CEEB")
-    .setTitle("Bot status updated")
-    .setDescription(
-      `**Type:** ${type}\n` +
-      `**Template:** ${name}\n` +
-      `**Live preview:** ${name}\n` +
-      `**Status:** dnd`
-    )
-    .setFooter({
-      text: `Updated by ${message.author.username}`
-    })
-    .setTimestamp();
-
-  return message.reply({
-    embeds: [embed]
-  });
-}
+      
