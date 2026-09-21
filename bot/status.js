@@ -11,19 +11,18 @@ module.exports = (client) => {
       status: "online",
       activities: [
         {
-          type: ActivityType.Custom,
           name: "custom",
+          type: ActivityType.Custom,
           state: "FEEL FREE TO TALK"
         },
         {
-          type: ActivityType.Listening,
-          name: `${members} Members`
+          name: `${members} Members`,
+          type: ActivityType.Listening
         }
       ]
     });
   };
 
   updateStatus();
-
   setInterval(updateStatus, 5 * 60 * 1000);
 };
