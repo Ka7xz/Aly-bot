@@ -10,7 +10,8 @@ const {
   ChannelSelectMenuBuilder,
   StringSelectMenuBuilder,
   ChannelType,
-  EmbedBuilder
+  EmbedBuilder,
+  PermissionFlagsBits
 } = require("discord.js");
 
 require("dotenv").config();
