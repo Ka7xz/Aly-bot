@@ -37,20 +37,14 @@ function setAlyStatus(client, type, name) {
   }
 
   client.user.setPresence({
-    status: "dnd",
+    status: "online",
     activities: [activity]
   });
 
-  console.log(
-    `[STATUS] ${type} - ${name}`
-  );
+  console.log(`[STATUS] ${type} - ${name}`);
 
   return true;
 }
-
-/* =========================
-   EXPORT
-========================= */
 
 module.exports = {
   setAlyStatus
